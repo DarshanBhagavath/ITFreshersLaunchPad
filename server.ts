@@ -20,6 +20,48 @@ const ai = new GoogleGenAI({
   },
 });
 
+app.get("/api/search-jobs", async (req, res) => {
+  try {
+    const apiKey = process.env.SERPAPI_API_KEY;
+    if (!apiKey) {
+      return res.status(503).json({ 
+        error: "SERPAPI_API_KEY not configured. Please add it to your secrets.",
+        requiresConfig: true
+      });
+    }
+
+    const { query, location } = req.query;
+    const searchQuery = query ? String(query) : "fresher IT jobs BE B.tech";
+    const searchLocation = location ? String(location) : "India";
+
+    const fetchJobs = async (q: string) => {
+      const url = new URL("https://serpapi.com/search.json");
+      url.searchParams.append("engine", "google_jobs");
+      url.searchParams.append("q", q);
+      url.searchParams.append("hl", "en");
+      url.searchParams.append("api_key", apiKey);
+      const response = await fetch(url.toString());
+      return response.json();
+    };
+
+    let data = await fetchJobs(`${searchQuery} in ${searchLocation}`);
+
+    if (data.error && data.error.includes("Google hasn't returned any results")) {
+      // Fallback query if no results
+      data = await fetchJobs(`software fresher jobs in ${searchLocation}`);
+    }
+
+    if (data.error) {
+      return res.status(500).json({ error: data.error });
+    }
+
+    res.json({ jobs: data.jobs_results || [] });
+  } catch (error) {
+    console.error("Error fetching jobs from SerpApi:", error);
+    res.status(500).json({ error: "Failed to fetch live jobs" });
+  }
+});
+
 app.post("/api/generate-resume", async (req, res) => {
   try {
     const { userDetails, jobDescription } = req.body;
