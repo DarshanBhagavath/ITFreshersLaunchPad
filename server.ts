@@ -63,6 +63,40 @@ Output the resume entirely in Markdown format. Do NOT wrap it in a code block or
   }
 });
 
+app.post("/api/reformat-resume", async (req, res) => {
+  try {
+    const { originalMarkdown, editedText } = req.body;
+    
+    if (!originalMarkdown || !editedText) {
+      return res.status(400).json({ error: "Missing originalMarkdown or editedText" });
+    }
+
+    const prompt = `You are a resume formatting assistant. 
+    
+Here is the original resume in Markdown format:
+<original>
+${originalMarkdown}
+</original>
+
+Here is the user's edited plain text version of that resume:
+<edited>
+${editedText}
+</edited>
+
+Your task is to re-apply the original Markdown formatting (headers, bolding, bullet points) to the edited text. Preserve the user's edits, but restore the rich markdown structure. Output ONLY the raw Markdown text, without any \`\`\`markdown wrappers or extra text.`;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3.6-flash",
+      contents: prompt,
+    });
+
+    res.json({ resumeMarkdown: response.text });
+  } catch (error) {
+    console.error("Error reformatting resume:", error);
+    res.status(500).json({ error: "Failed to reformat resume" });
+  }
+});
+
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({

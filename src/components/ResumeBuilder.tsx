@@ -4,6 +4,8 @@ import { Download, FileText, FileDown, Loader2, CheckCircle2, Edit2, Save, Type,
 import { Job, UserDetails } from "../types";
 import { Document, Packer, Paragraph, TextRun, HeadingLevel } from "docx";
 import { saveAs } from "file-saver";
+import { toPng } from "html-to-image";
+import jsPDF from "jspdf";
 
 interface ResumeBuilderProps {
   job: Job;
@@ -13,6 +15,7 @@ interface ResumeBuilderProps {
 
 export function ResumeBuilder({ job, userDetails, onClose }: ResumeBuilderProps) {
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isReformatting, setIsReformatting] = useState(false);
   const [generatedResume, setGeneratedResume] = useState<string | null>(null);
   
   const [isEditing, setIsEditing] = useState(false);
@@ -24,9 +27,19 @@ export function ResumeBuilder({ job, userDetails, onClose }: ResumeBuilderProps)
   const contentRef = useRef<HTMLDivElement>(null);
 
   const themes = {
-    modern: "prose prose-indigo font-sans max-w-none text-sm text-gray-800",
-    classic: "prose prose-stone font-serif max-w-none text-sm text-gray-900",
-    minimalist: "prose prose-slate font-mono max-w-none text-xs text-gray-700 leading-relaxed",
+    modern: "prose prose-indigo font-sans max-w-none text-sm text-gray-800 prose-headings:font-bold prose-headings:bg-indigo-50 prose-headings:text-indigo-900 prose-headings:px-3 prose-headings:py-1.5 prose-headings:rounded-md prose-headings:border-l-4 prose-headings:border-indigo-600 prose-h1:text-2xl prose-h2:text-xl",
+    classic: "prose prose-stone font-serif max-w-none text-sm text-gray-900 prose-headings:font-bold prose-headings:bg-stone-100 prose-headings:text-stone-900 prose-headings:px-3 prose-headings:py-1.5 prose-headings:border-b-2 prose-headings:border-stone-800",
+    minimalist: "prose prose-slate font-mono max-w-none text-xs text-gray-700 leading-relaxed prose-headings:font-bold prose-headings:bg-slate-100 prose-headings:text-slate-900 prose-headings:px-2 prose-headings:py-1 prose-headings:rounded uppercase tracking-widest",
+  };
+
+  const stripTags = (text: string) => {
+    if (!text) return "";
+    return text
+      .replace(/<[^>]*>?/gm, '') // Remove HTML tags
+      .replace(/[#_*~`]/g, '') // Remove Markdown formatting chars
+      .replace(/\[(.*?)\]\(.*?\)/g, '$1') // Remove links
+      .replace(/^\s*>\s?/gm, '') // Remove blockquotes
+      .trim();
   };
 
   const handleGenerate = async () => {
@@ -50,7 +63,7 @@ export function ResumeBuilder({ job, userDetails, onClose }: ResumeBuilderProps)
 
       const data = await response.json();
       setGeneratedResume(data.resumeMarkdown);
-      setEditableResume(data.resumeMarkdown);
+      setEditableResume(stripTags(data.resumeMarkdown));
     } catch (error) {
       console.error(error);
       alert("Error generating resume. Please try again.");
@@ -59,14 +72,44 @@ export function ResumeBuilder({ job, userDetails, onClose }: ResumeBuilderProps)
     }
   };
 
-  const toggleEdit = () => {
+  const toggleEdit = async () => {
     if (isEditing) {
-      setGeneratedResume(editableResume);
+      // Saving edits
+      setIsReformatting(true);
+      try {
+        const response = await fetch("/api/reformat-resume", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            originalMarkdown: generatedResume,
+            editedText: editableResume,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to reformat resume");
+        }
+
+        const data = await response.json();
+        setGeneratedResume(data.resumeMarkdown);
+      } catch (error) {
+        console.error(error);
+        alert("Error saving edits. Storing as plain text.");
+        setGeneratedResume(editableResume);
+      } finally {
+        setIsReformatting(false);
+        setIsEditing(false);
+      }
+    } else {
+      setEditableResume(stripTags(generatedResume || ""));
+      setIsEditing(true);
     }
-    setIsEditing(!isEditing);
   };
 
   const downloadPDF = async () => {
+    const element = document.getElementById("resume-preview-content");
+    if (!element) return;
+    
     // Save edits if currently editing
     const wasEditing = isEditing;
     if (wasEditing) {
@@ -74,9 +117,38 @@ export function ResumeBuilder({ job, userDetails, onClose }: ResumeBuilderProps)
       setIsEditing(false);
     }
     
-    setTimeout(() => {
-      window.print();
-      if (wasEditing) setIsEditing(true);
+    setTimeout(async () => {
+      try {
+        const dataUrl = await toPng(element, { quality: 1, pixelRatio: 2 });
+        const pdf = new jsPDF("p", "mm", "a4");
+        
+        const pdfWidth = pdf.internal.pageSize.getWidth();
+        const pdfHeight = pdf.internal.pageSize.getHeight();
+        
+        const imgProps = pdf.getImageProperties(dataUrl);
+        const imgHeightInMm = (imgProps.height * pdfWidth) / imgProps.width;
+        
+        let heightLeft = imgHeightInMm;
+        let position = 0;
+        
+        // Add first page
+        pdf.addImage(dataUrl, "PNG", 0, position, pdfWidth, imgHeightInMm);
+        heightLeft -= pdfHeight;
+        
+        // Add subsequent pages if content overflows
+        while (heightLeft >= 0) {
+          position = heightLeft - imgHeightInMm; // Shift image up
+          pdf.addPage();
+          pdf.addImage(dataUrl, "PNG", 0, position, pdfWidth, imgHeightInMm);
+          heightLeft -= pdfHeight;
+        }
+        
+        pdf.save(`${userDetails.fullName.replace(/\s+/g, '_')}_Resume.pdf`);
+      } catch (err) {
+        console.error("PDF generation failed:", err);
+      } finally {
+        if (wasEditing) setIsEditing(true);
+      }
     }, 100);
   };
 
@@ -259,9 +331,12 @@ export function ResumeBuilder({ job, userDetails, onClose }: ResumeBuilderProps)
                   
                   <button 
                     onClick={toggleEdit}
-                    className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 text-sm font-medium text-gray-700 transition"
+                    disabled={isReformatting}
+                    className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 text-sm font-medium text-gray-700 transition disabled:opacity-50"
                   >
-                    {isEditing ? (
+                    {isReformatting ? (
+                      <><Loader2 className="w-4 h-4 animate-spin" /> Saving...</>
+                    ) : isEditing ? (
                       <><Save className="w-4 h-4" /> Save Edits</>
                     ) : (
                       <><Edit2 className="w-4 h-4" /> Edit Content</>
