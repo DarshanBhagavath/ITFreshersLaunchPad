@@ -1,0 +1,6 @@
+{
+  "name": "IT Fresher Launchpad",
+  "description": "A platform for IT freshers to view career roadmaps, search for jobs in India, and generate AI-tailored resumes.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

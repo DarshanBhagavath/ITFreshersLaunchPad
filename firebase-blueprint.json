@@ -1,0 +1,33 @@
+{
+  "collections": [
+    {
+      "name": "users",
+      "rules": [
+        {
+          "type": "read",
+          "condition": "request.auth != null && request.auth.uid == resource.id"
+        },
+        {
+          "type": "write",
+          "condition": "request.auth != null && request.auth.uid == request.resource.id"
+        }
+      ],
+      "fields": [
+        { "name": "fullName", "type": "string" },
+        { "name": "phoneNumber", "type": "string" },
+        { "name": "emailId", "type": "string" },
+        { "name": "address", "type": "string" },
+        { "name": "highestEducation", "type": "string" },
+        { "name": "stream", "type": "string" }
+      ],
+      "queries": [
+        {
+          "name": "getUserProfile",
+          "type": "get",
+          "description": "Fetch a user profile by user ID",
+          "params": ["userId"]
+        }
+      ]
+    }
+  ]
+}
