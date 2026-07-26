@@ -1,6 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import Markdown from "react-markdown";
-import { Download, FileText, FileDown, Loader2, CheckCircle2, Edit2, Save, Type } from "lucide-react";
+import { Download, FileText, FileDown, Loader2, CheckCircle2, Edit2, Save, Type, Printer } from "lucide-react";
 import { Job, UserDetails } from "../types";
 import { Document, Packer, Paragraph, TextRun, HeadingLevel } from "docx";
 import { saveAs } from "file-saver";
@@ -22,6 +22,8 @@ export function ResumeBuilder({ job, userDetails, onClose }: ResumeBuilderProps)
   
   type ThemeType = 'modern' | 'classic' | 'minimalist';
   const [theme, setTheme] = useState<ThemeType>('modern');
+
+  const contentRef = useRef<HTMLDivElement>(null);
 
   const themes = {
     modern: "prose prose-indigo font-sans max-w-none text-sm text-gray-800",
@@ -70,31 +72,45 @@ export function ResumeBuilder({ job, userDetails, onClose }: ResumeBuilderProps)
     const element = document.getElementById("resume-preview-content");
     if (!element) return;
     
-    // Ensure we temporarily remove editing class if it was applied and save changes
+    // Save edits if currently editing
     const wasEditing = isEditing;
     if (wasEditing) {
       setGeneratedResume(editableResume);
       setIsEditing(false);
     }
-
-    // Short timeout to allow React to render the non-editing view if needed
+    
     setTimeout(async () => {
       try {
         const dataUrl = await toPng(element, { quality: 1, pixelRatio: 2 });
         const pdf = new jsPDF("p", "mm", "a4");
         
         const pdfWidth = pdf.internal.pageSize.getWidth();
+        const pdfHeight = pdf.internal.pageSize.getHeight();
         const imgProps = pdf.getImageProperties(dataUrl);
-        const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+        const imgHeightInMm = (imgProps.height * pdfWidth) / imgProps.width;
         
-        pdf.addImage(dataUrl, "PNG", 0, 0, pdfWidth, pdfHeight);
+        let heightLeft = imgHeightInMm;
+        let position = 0;
+        
+        // Add first page
+        pdf.addImage(dataUrl, "PNG", 0, position, pdfWidth, imgHeightInMm);
+        heightLeft -= pdfHeight;
+        
+        // Add subsequent pages if content overflows
+        while (heightLeft >= 0) {
+          position = heightLeft - imgHeightInMm; // Shift image up
+          pdf.addPage();
+          pdf.addImage(dataUrl, "PNG", 0, position, pdfWidth, imgHeightInMm);
+          heightLeft -= pdfHeight;
+        }
+        
         pdf.save(`${userDetails.fullName.replace(/\s+/g, '_')}_Resume.pdf`);
-      } catch (error) {
-        console.error("Failed to generate PDF", error);
+      } catch (err) {
+        console.error("PDF generation failed:", err);
       } finally {
         if (wasEditing) setIsEditing(true);
       }
-    }, 100);
+    }, 150);
   };
 
   const downloadDocx = () => {
@@ -103,16 +119,17 @@ export function ResumeBuilder({ job, userDetails, onClose }: ResumeBuilderProps)
 
     const parseInlineMarkdown = (text: string): TextRun[] => {
       const runs: TextRun[] = [];
-      const regex = /(\*\*.*?\*\*|\*.*?\*)/g;
+      const regex = /(\*\*.*?\*\*|__.*?__|\*.*?\*|_.*?_)/g;
       let lastIndex = 0;
       
       let match;
       while ((match = regex.exec(text)) !== null) {
         if (match.index > lastIndex) {
-          runs.push(new TextRun({ text: text.substring(lastIndex, match.index) }));
+          const plainText = text.substring(lastIndex, match.index).replace(/(\*\*|__|\*|_|--)/g, '');
+          if (plainText) runs.push(new TextRun({ text: plainText }));
         }
         const matchedText = match[0];
-        if (matchedText.startsWith('**')) {
+        if (matchedText.startsWith('**') || matchedText.startsWith('__')) {
           runs.push(new TextRun({ text: matchedText.substring(2, matchedText.length - 2), bold: true }));
         } else {
           runs.push(new TextRun({ text: matchedText.substring(1, matchedText.length - 1), italics: true }));
@@ -121,11 +138,13 @@ export function ResumeBuilder({ job, userDetails, onClose }: ResumeBuilderProps)
       }
       
       if (lastIndex < text.length) {
-        runs.push(new TextRun({ text: text.substring(lastIndex) }));
+        const plainText = text.substring(lastIndex).replace(/(\*\*|__|\*|_|--)/g, '');
+        if (plainText) runs.push(new TextRun({ text: plainText }));
       }
       
-      if (runs.length === 0 && text.trim().length > 0) {
-         runs.push(new TextRun({ text }));
+      if (runs.length === 0) {
+         const plainText = text.replace(/(\*\*|__|\*|_|--)/g, '');
+         if (plainText.trim().length > 0) runs.push(new TextRun({ text: plainText }));
       }
       
       return runs;
@@ -134,7 +153,7 @@ export function ResumeBuilder({ job, userDetails, onClose }: ResumeBuilderProps)
     const lines = currentResumeText.split(/\r?\n/);
     const paragraphs = lines.map(line => {
       const trimmedLine = line.trim();
-      if (trimmedLine === "---" || trimmedLine === "***" || trimmedLine.startsWith("--")) {
+      if (/^[-*_]{2,}$/.test(trimmedLine) || trimmedLine.startsWith("--")) {
         return new Paragraph({ text: "" });
       } else if (line.startsWith("# ")) {
         return new Paragraph({
@@ -297,8 +316,10 @@ export function ResumeBuilder({ job, userDetails, onClose }: ResumeBuilderProps)
                   placeholder="Edit your resume content in Markdown..."
                 />
               ) : (
-                <div id="resume-preview-content" className={`${themes[theme]} mx-auto`}>
-                  <Markdown>{generatedResume}</Markdown>
+                <div className="w-full flex justify-center bg-white p-4 sm:p-8" style={{ minHeight: "100%" }}>
+                  <div ref={contentRef} id="resume-preview-content" className={`${themes[theme]} mx-auto w-full max-w-[800px] bg-white`}>
+                    <Markdown>{generatedResume}</Markdown>
+                  </div>
                 </div>
               )
             ) : (
