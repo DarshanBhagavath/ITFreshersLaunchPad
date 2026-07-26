@@ -4,8 +4,6 @@ import { Download, FileText, FileDown, Loader2, CheckCircle2, Edit2, Save, Type,
 import { Job, UserDetails } from "../types";
 import { Document, Packer, Paragraph, TextRun, HeadingLevel } from "docx";
 import { saveAs } from "file-saver";
-import { toPng } from "html-to-image";
-import jsPDF from "jspdf";
 
 interface ResumeBuilderProps {
   job: Job;
@@ -69,9 +67,6 @@ export function ResumeBuilder({ job, userDetails, onClose }: ResumeBuilderProps)
   };
 
   const downloadPDF = async () => {
-    const element = document.getElementById("resume-preview-content");
-    if (!element) return;
-    
     // Save edits if currently editing
     const wasEditing = isEditing;
     if (wasEditing) {
@@ -79,38 +74,10 @@ export function ResumeBuilder({ job, userDetails, onClose }: ResumeBuilderProps)
       setIsEditing(false);
     }
     
-    setTimeout(async () => {
-      try {
-        const dataUrl = await toPng(element, { quality: 1, pixelRatio: 2 });
-        const pdf = new jsPDF("p", "mm", "a4");
-        
-        const pdfWidth = pdf.internal.pageSize.getWidth();
-        const pdfHeight = pdf.internal.pageSize.getHeight();
-        const imgProps = pdf.getImageProperties(dataUrl);
-        const imgHeightInMm = (imgProps.height * pdfWidth) / imgProps.width;
-        
-        let heightLeft = imgHeightInMm;
-        let position = 0;
-        
-        // Add first page
-        pdf.addImage(dataUrl, "PNG", 0, position, pdfWidth, imgHeightInMm);
-        heightLeft -= pdfHeight;
-        
-        // Add subsequent pages if content overflows
-        while (heightLeft >= 0) {
-          position = heightLeft - imgHeightInMm; // Shift image up
-          pdf.addPage();
-          pdf.addImage(dataUrl, "PNG", 0, position, pdfWidth, imgHeightInMm);
-          heightLeft -= pdfHeight;
-        }
-        
-        pdf.save(`${userDetails.fullName.replace(/\s+/g, '_')}_Resume.pdf`);
-      } catch (err) {
-        console.error("PDF generation failed:", err);
-      } finally {
-        if (wasEditing) setIsEditing(true);
-      }
-    }, 150);
+    setTimeout(() => {
+      window.print();
+      if (wasEditing) setIsEditing(true);
+    }, 100);
   };
 
   const downloadDocx = () => {
