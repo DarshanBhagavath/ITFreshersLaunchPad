@@ -70,9 +70,12 @@ export function ResumeBuilder({ job, userDetails, onClose }: ResumeBuilderProps)
     const element = document.getElementById("resume-preview-content");
     if (!element) return;
     
-    // Ensure we temporarily remove editing class if it was applied
+    // Ensure we temporarily remove editing class if it was applied and save changes
     const wasEditing = isEditing;
-    if (wasEditing) setIsEditing(false);
+    if (wasEditing) {
+      setGeneratedResume(editableResume);
+      setIsEditing(false);
+    }
 
     // Short timeout to allow React to render the non-editing view if needed
     setTimeout(async () => {
@@ -95,38 +98,72 @@ export function ResumeBuilder({ job, userDetails, onClose }: ResumeBuilderProps)
   };
 
   const downloadDocx = () => {
-    if (!generatedResume) return;
+    const currentResumeText = isEditing ? editableResume : generatedResume;
+    if (!currentResumeText) return;
 
-    const lines = generatedResume.split("\n");
+    const parseInlineMarkdown = (text: string): TextRun[] => {
+      const runs: TextRun[] = [];
+      const regex = /(\*\*.*?\*\*|\*.*?\*)/g;
+      let lastIndex = 0;
+      
+      let match;
+      while ((match = regex.exec(text)) !== null) {
+        if (match.index > lastIndex) {
+          runs.push(new TextRun({ text: text.substring(lastIndex, match.index) }));
+        }
+        const matchedText = match[0];
+        if (matchedText.startsWith('**')) {
+          runs.push(new TextRun({ text: matchedText.substring(2, matchedText.length - 2), bold: true }));
+        } else {
+          runs.push(new TextRun({ text: matchedText.substring(1, matchedText.length - 1), italics: true }));
+        }
+        lastIndex = regex.lastIndex;
+      }
+      
+      if (lastIndex < text.length) {
+        runs.push(new TextRun({ text: text.substring(lastIndex) }));
+      }
+      
+      if (runs.length === 0 && text.trim().length > 0) {
+         runs.push(new TextRun({ text }));
+      }
+      
+      return runs;
+    };
+
+    const lines = currentResumeText.split(/\r?\n/);
     const paragraphs = lines.map(line => {
-      if (line.startsWith("# ")) {
+      const trimmedLine = line.trim();
+      if (trimmedLine === "---" || trimmedLine === "***" || trimmedLine.startsWith("--")) {
+        return new Paragraph({ text: "" });
+      } else if (line.startsWith("# ")) {
         return new Paragraph({
-          text: line.replace("# ", ""),
+          children: parseInlineMarkdown(line.substring(2)),
           heading: HeadingLevel.HEADING_1,
           spacing: { before: 200, after: 100 }
         });
       } else if (line.startsWith("## ")) {
         return new Paragraph({
-          text: line.replace("## ", ""),
+          children: parseInlineMarkdown(line.substring(3)),
           heading: HeadingLevel.HEADING_2,
           spacing: { before: 150, after: 100 }
         });
       } else if (line.startsWith("### ")) {
         return new Paragraph({
-          text: line.replace("### ", ""),
+          children: parseInlineMarkdown(line.substring(4)),
           heading: HeadingLevel.HEADING_3,
           spacing: { before: 100, after: 50 }
         });
       } else if (line.startsWith("- ") || line.startsWith("* ")) {
         return new Paragraph({
-          text: line.substring(2),
+          children: parseInlineMarkdown(line.substring(2)),
           bullet: { level: 0 }
         });
-      } else if (line.trim() === "") {
+      } else if (trimmedLine === "") {
         return new Paragraph({ text: "" });
       } else {
         return new Paragraph({
-          children: [new TextRun(line)],
+          children: parseInlineMarkdown(line),
           spacing: { after: 50 }
         });
       }
