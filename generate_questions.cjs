@@ -5,7 +5,7 @@ const data = {};
 
 const generateQuestions = (skill) => {
   const questions = [];
-  for (let i = 1; i <= 50; i++) {
+  for (let i = 1; i <= 25; i++) {
     const options = [
       `Option A for ${skill} Q${i}`,
       `Option B for ${skill} Q${i}`,
@@ -124,7 +124,7 @@ const realQuestions = {
 // Generate 30 more mock questions per skill to reach 50
 for (const skill of skills) {
   const existingCount = realQuestions[skill] ? realQuestions[skill].length : 0;
-  for (let i = existingCount + 1; i <= 50; i++) {
+  for (let i = existingCount + 1; i <= 25; i++) {
     const qText = `What is a common concept in ${skill} related to topic ${i}?`;
     const options = [
       `Option A for ${skill} Q${i}`,

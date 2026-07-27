@@ -50,7 +50,7 @@ export function InterviewQuiz() {
         <div className="text-center mb-10">
           <h2 className="text-3xl font-bold text-gray-900 mb-4">Interview Skill Assessment</h2>
           <p className="text-gray-600 max-w-2xl mx-auto text-lg">
-            Test your knowledge with our comprehensive set of 50 most commonly asked interview questions for each major IT skill.
+            Test your knowledge with our comprehensive set of 25 most commonly asked interview questions for each major IT skill.
           </p>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -64,7 +64,7 @@ export function InterviewQuiz() {
                 <h3 className="text-xl font-bold text-gray-900 group-hover:text-indigo-600 transition-colors mb-2">
                   {skill} Interview Quiz
                 </h3>
-                <p className="text-gray-500 text-sm">50 Questions • Multiple Choice</p>
+                <p className="text-gray-500 text-sm">25 Questions • Multiple Choice</p>
               </div>
               <BookOpen className="w-8 h-8 text-indigo-400 group-hover:text-indigo-600 transition-colors" />
             </button>
