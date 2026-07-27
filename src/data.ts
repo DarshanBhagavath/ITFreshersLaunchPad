@@ -1,7 +1,7 @@
 import { Job } from "./types";
 
 export const LOCATIONS = [
-  "Bangalore",
+  "Bangalore / Bengaluru",
   "Hyderabad",
   "Pune",
   "Chennai",

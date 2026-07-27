@@ -1,5 +1,6 @@
 import express from "express";
 import path from "path";
+import fs from "fs/promises";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
@@ -20,7 +21,29 @@ const ai = new GoogleGenAI({
   },
 });
 
-app.get("/api/search-jobs", async (req, res) => {
+const CACHE_FILE = path.join(process.cwd(), 'jobs_cache.json');
+const CACHE_DURATION_MS = 24 * 60 * 60 * 1000; // 1 day
+
+async function readCache() {
+  try {
+    const data = await fs.readFile(CACHE_FILE, 'utf-8');
+    return JSON.parse(data);
+  } catch (err) {
+    return {};
+  }
+}
+
+async function writeCache(cacheData: any) {
+  try {
+    await fs.writeFile(CACHE_FILE, JSON.stringify(cacheData, null, 2));
+  } catch (err) {
+    console.error("Error writing cache:", err);
+  }
+}
+
+const LOCATIONS = ["Bangalore", "Hyderabad", "Pune", "Chennai", "Mumbai", "Delhi NCR", "India"];
+
+app.get("/api/jobs", async (req, res) => {
   try {
     const apiKey = process.env.SERPAPI_API_KEY;
     if (!apiKey) {
@@ -30,32 +53,65 @@ app.get("/api/search-jobs", async (req, res) => {
       });
     }
 
-    const { query, location } = req.query;
-    const searchQuery = query ? String(query) : "fresher IT jobs BE B.tech";
-    const searchLocation = location ? String(location) : "India";
+    const cache = await readCache();
+    const cacheKey = "all_jobs";
 
-    const fetchJobs = async (q: string) => {
+    if (cache[cacheKey] && (Date.now() - cache[cacheKey].timestamp < CACHE_DURATION_MS)) {
+      console.log(`Returning cached results for ${cacheKey}`);
+      return res.json({ jobs: cache[cacheKey].jobs });
+    }
+
+    const fetchJobsForLocation = async (location: string) => {
+      const q = `fresher IT jobs BE B.tech in ${location}`;
       const url = new URL("https://serpapi.com/search.json");
       url.searchParams.append("engine", "google_jobs");
       url.searchParams.append("q", q);
       url.searchParams.append("hl", "en");
       url.searchParams.append("api_key", apiKey);
-      const response = await fetch(url.toString());
-      return response.json();
+      
+      try {
+        const response = await fetch(url.toString());
+        const data = await response.json();
+        
+        if (data.error && data.error.includes("Google hasn't returned any results")) {
+          url.searchParams.set("q", `software fresher jobs in ${location}`);
+          const fallbackRes = await fetch(url.toString());
+          const fallbackData = await fallbackRes.json();
+          return (fallbackData.jobs_results || []).map((j: any) => ({ ...j, searched_location: location }));
+        }
+        
+        return (data.jobs_results || []).map((j: any) => ({ ...j, searched_location: location }));
+      } catch (e) {
+        console.error(`Failed to fetch jobs for ${location}`, e);
+        return [];
+      }
     };
 
-    let data = await fetchJobs(`${searchQuery} in ${searchLocation}`);
+    const allJobsPromises = LOCATIONS.map(loc => fetchJobsForLocation(loc));
+    const allJobsResults = await Promise.all(allJobsPromises);
+    
+    let allJobs: any[] = [];
+    allJobsResults.forEach(jobs => {
+      allJobs = [...allJobs, ...jobs];
+    });
 
-    if (data.error && data.error.includes("Google hasn't returned any results")) {
-      // Fallback query if no results
-      data = await fetchJobs(`software fresher jobs in ${searchLocation}`);
-    }
+    // Remove duplicates based on job_id
+    const uniqueJobsMap = new Map();
+    allJobs.forEach(job => {
+      if (!uniqueJobsMap.has(job.job_id)) {
+        uniqueJobsMap.set(job.job_id, job);
+      }
+    });
+    
+    const finalJobs = Array.from(uniqueJobsMap.values());
 
-    if (data.error) {
-      return res.status(500).json({ error: data.error });
-    }
+    cache[cacheKey] = {
+      timestamp: Date.now(),
+      jobs: finalJobs
+    };
+    await writeCache(cache);
 
-    res.json({ jobs: data.jobs_results || [] });
+    res.json({ jobs: finalJobs });
   } catch (error) {
     console.error("Error fetching jobs from SerpApi:", error);
     res.status(500).json({ error: "Failed to fetch live jobs" });
