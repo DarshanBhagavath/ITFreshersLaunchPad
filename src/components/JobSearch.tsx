@@ -1,5 +1,4 @@
-import React, { useState, useEffect } from "react";
-import { LOCATIONS } from "../data";
+import React, { useState, useEffect, useMemo } from "react";
 import { Job, UserDetails } from "../types";
 import { MapPin, Building, Briefcase, FileSignature, Loader2, AlertCircle, ChevronLeft, ChevronRight, ExternalLink } from "lucide-react";
 import { ResumeBuilder } from "./ResumeBuilder";
@@ -64,18 +63,63 @@ export function JobSearch({ userDetails }: JobSearchProps) {
     : allLiveJobs.filter(job => {
         if (!job.location) return false;
         const jobLoc = job.location.toLowerCase();
-        const selLoc = selectedLocation.toLowerCase();
         
-        if (selLoc.includes("bangalore") || selLoc.includes("bengaluru")) {
-          return jobLoc.includes("bangalore") || jobLoc.includes("bengaluru");
+        switch (selectedLocation) {
+          case "Bangalore / Bengaluru":
+            return jobLoc.includes("bangalore") || jobLoc.includes("bengaluru");
+          case "Mumbai":
+            return jobLoc.includes("mumbai") || jobLoc.includes("navi mumbai") || jobLoc.includes("thane");
+          case "Delhi NCR":
+            return jobLoc.includes("delhi") || jobLoc.includes("noida") || jobLoc.includes("gurgaon") || jobLoc.includes("gurugram") || jobLoc.includes("new delhi");
+          case "Hyderabad":
+            return jobLoc.includes("hyderabad") || jobLoc.includes("secunderabad");
+          case "Kochi":
+            return jobLoc.includes("kochi") || jobLoc.includes("cochin");
+          case "Trivandrum":
+            return jobLoc.includes("trivandrum") || jobLoc.includes("thiruvananthapuram");
+          default:
+            return jobLoc.includes(selectedLocation.toLowerCase());
         }
-        
-        return jobLoc.includes(selLoc);
       });
 
   const totalPages = Math.max(1, Math.ceil(filteredJobs.length / ITEMS_PER_PAGE));
   const currentJobs = filteredJobs.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
+
+  const dynamicLocations = useMemo(() => {
+    const locSet = new Set<string>();
+    allLiveJobs.forEach(job => {
+      if (!job.location) return;
+      const lowerLoc = job.location.toLowerCase();
+      if (lowerLoc.includes("bangalore") || lowerLoc.includes("bengaluru")) locSet.add("Bangalore / Bengaluru");
+      else if (lowerLoc.includes("mumbai") || lowerLoc.includes("navi mumbai") || lowerLoc.includes("thane")) locSet.add("Mumbai");
+      else if (lowerLoc.includes("pune")) locSet.add("Pune");
+      else if (lowerLoc.includes("hyderabad") || lowerLoc.includes("secunderabad")) locSet.add("Hyderabad");
+      else if (lowerLoc.includes("chennai")) locSet.add("Chennai");
+      else if (lowerLoc.includes("delhi") || lowerLoc.includes("noida") || lowerLoc.includes("gurgaon") || lowerLoc.includes("gurugram") || lowerLoc.includes("new delhi")) locSet.add("Delhi NCR");
+      else if (lowerLoc.includes("kolkata")) locSet.add("Kolkata");
+      else if (lowerLoc.includes("ahmedabad")) locSet.add("Ahmedabad");
+      else if (lowerLoc.includes("kochi") || lowerLoc.includes("cochin")) locSet.add("Kochi");
+      else if (lowerLoc.includes("trivandrum") || lowerLoc.includes("thiruvananthapuram")) locSet.add("Trivandrum");
+      else if (lowerLoc.includes("indore")) locSet.add("Indore");
+      else if (lowerLoc.includes("jaipur")) locSet.add("Jaipur");
+      else if (lowerLoc.includes("chandigarh")) locSet.add("Chandigarh");
+      else if (lowerLoc.includes("lucknow")) locSet.add("Lucknow");
+      else if (lowerLoc.includes("coimbatore")) locSet.add("Coimbatore");
+      else {
+        // Fallback: extract the first part before a comma
+        const parts = job.location.split(",");
+        if (parts.length > 0 && parts[0].trim().length > 0) {
+          const firstPart = parts[0].trim();
+          if (firstPart.toLowerCase() !== "india") {
+             locSet.add(firstPart);
+          }
+        }
+      }
+    });
+    
+    return Array.from(locSet).sort((a, b) => a.localeCompare(b));
+  }, [allLiveJobs]);
 
   return (
     <div className="max-w-6xl mx-auto py-8 px-4">
@@ -94,7 +138,7 @@ export function JobSearch({ userDetails }: JobSearchProps) {
               className="w-full appearance-none bg-white border border-gray-300 text-gray-900 py-3 px-4 pr-10 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 font-medium"
             >
               <option value="India">All India</option>
-              {LOCATIONS.map(loc => (
+              {dynamicLocations.map(loc => (
                 <option key={loc} value={loc}>{loc}</option>
               ))}
             </select>

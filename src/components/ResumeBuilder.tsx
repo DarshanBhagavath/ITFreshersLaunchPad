@@ -2,7 +2,7 @@ import React, { useState, useRef } from "react";
 import Markdown from "react-markdown";
 import { Download, FileText, FileDown, Loader2, CheckCircle2, Edit2, Save, Type, Printer } from "lucide-react";
 import { Job, UserDetails } from "../types";
-import { Document, Packer, Paragraph, TextRun, HeadingLevel } from "docx";
+import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } from "docx";
 import { saveAs } from "file-saver";
 import { toPng } from "html-to-image";
 import jsPDF from "jspdf";
@@ -193,36 +193,40 @@ export function ResumeBuilder({ job, userDetails, onClose }: ResumeBuilderProps)
     const paragraphs = lines.map(line => {
       const trimmedLine = line.trim();
       if (/^[-*_]{2,}$/.test(trimmedLine) || trimmedLine.startsWith("--")) {
-        return new Paragraph({ text: "" });
+        return new Paragraph({ text: "", spacing: { after: 120 } });
       } else if (line.startsWith("# ")) {
         return new Paragraph({
           children: parseInlineMarkdown(line.substring(2)),
           heading: HeadingLevel.HEADING_1,
-          spacing: { before: 200, after: 100 }
+          alignment: AlignmentType.CENTER,
+          spacing: { before: 240, after: 120 }
         });
       } else if (line.startsWith("## ")) {
         return new Paragraph({
           children: parseInlineMarkdown(line.substring(3)),
           heading: HeadingLevel.HEADING_2,
-          spacing: { before: 150, after: 100 }
+          spacing: { before: 240, after: 120 },
+          border: { bottom: { color: "auto", space: 1, style: "single", size: 6 } }
         });
       } else if (line.startsWith("### ")) {
         return new Paragraph({
           children: parseInlineMarkdown(line.substring(4)),
           heading: HeadingLevel.HEADING_3,
-          spacing: { before: 100, after: 50 }
+          spacing: { before: 120, after: 80 }
         });
       } else if (line.startsWith("- ") || line.startsWith("* ")) {
         return new Paragraph({
           children: parseInlineMarkdown(line.substring(2)),
-          bullet: { level: 0 }
+          bullet: { level: 0 },
+          spacing: { before: 40, after: 40 }
         });
       } else if (trimmedLine === "") {
-        return new Paragraph({ text: "" });
+        return new Paragraph({ text: "", spacing: { after: 120 } });
       } else {
         return new Paragraph({
           children: parseInlineMarkdown(line),
-          spacing: { after: 50 }
+          spacing: { before: 80, after: 80 },
+          alignment: AlignmentType.JUSTIFIED
         });
       }
     });

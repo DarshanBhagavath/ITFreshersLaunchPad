@@ -6,7 +6,8 @@
 import React, { useState, useEffect } from "react";
 import { JobSearch } from "./components/JobSearch";
 import { Roadmap } from "./components/Roadmap";
-import { Briefcase, Map, GraduationCap, LogOut } from "lucide-react";
+import { TrainingVideos } from "./components/TrainingVideos";
+import { Briefcase, Map, GraduationCap, LogOut, Video } from "lucide-react";
 import { Auth } from "./components/Auth";
 import { auth, db } from "./lib/firebase";
 import { onAuthStateChanged, signOut } from "firebase/auth";
@@ -14,7 +15,7 @@ import { doc, getDoc } from "firebase/firestore";
 import { UserDetails } from "./types";
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<"roadmap" | "jobs">("roadmap");
+  const [activeTab, setActiveTab] = useState<"roadmap" | "jobs" | "training">("roadmap");
   const [user, setUser] = useState<any>(null);
   const [userDetails, setUserDetails] = useState<UserDetails | null>(null);
   const [loading, setLoading] = useState(true);
@@ -97,6 +98,17 @@ export default function App() {
                 <Briefcase className="w-4 h-4" />
                 <span className="hidden sm:inline">Job Search</span>
               </button>
+              <button
+                onClick={() => setActiveTab("training")}
+                className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                  activeTab === "training"
+                    ? "bg-white text-indigo-700 shadow-sm"
+                    : "text-gray-600 hover:text-gray-900 hover:bg-gray-200"
+                }`}
+              >
+                <Video className="w-4 h-4" />
+                <span className="hidden sm:inline">Training Videos</span>
+              </button>
             </nav>
 
             <button 
@@ -112,7 +124,9 @@ export default function App() {
 
       {/* Main Content */}
       <main className="pb-12">
-        {activeTab === "roadmap" ? <Roadmap /> : <JobSearch userDetails={userDetails} />}
+        {activeTab === "roadmap" && <Roadmap />}
+        {activeTab === "jobs" && <JobSearch userDetails={userDetails} />}
+        {activeTab === "training" && <TrainingVideos />}
       </main>
     </div>
   );
