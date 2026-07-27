@@ -9,6 +9,30 @@ interface JobSearchProps {
 
 const ITEMS_PER_PAGE = 10;
 
+const getInterviewVideoForJob = (job: Job) => {
+  const textToSearch = `${job.title} ${job.description} ${job.tags.join(" ")}`.toLowerCase();
+  
+  if (textToSearch.includes("java") && !textToSearch.includes("javascript")) {
+    return { id: "4Ib9amXl4gI", title: "Java Interview Questions for Freshers" };
+  }
+  if (textToSearch.includes("python")) {
+    return { id: "0K_eZGS5NsU", title: "Python Interview Questions for Freshers" };
+  }
+  if (textToSearch.includes("react")) {
+    return { id: "YvB1F32CTLg", title: "React Interview Questions for Freshers" };
+  }
+  if (textToSearch.includes("sql") || textToSearch.includes("database")) {
+    return { id: "oX5Y26O5dBE", title: "SQL Interview Questions for Freshers" };
+  }
+  if (textToSearch.includes("javascript") || textToSearch.includes("node")) {
+    return { id: "kUTbEcO-lrk", title: "JavaScript Interview Questions for Freshers" };
+  }
+  if (textToSearch.includes("c++") || textToSearch.includes("cpp")) {
+    return { id: "6HuptuHyJZg", title: "C++ Interview Questions for Freshers" };
+  }
+  return { id: "WwYwQyTOiOk", title: "IT Interview Questions for Freshers" };
+};
+
 export function JobSearch({ userDetails }: JobSearchProps) {
   const [selectedLocation, setSelectedLocation] = useState<string>("India");
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
@@ -200,6 +224,24 @@ export function JobSearch({ userDetails }: JobSearchProps) {
                         {tag}
                       </span>
                     ))}
+                  </div>
+
+                  {/* Interview Video Section */}
+                  <div className="mt-6 border-t border-gray-100 pt-4">
+                    <h4 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                      <span className="bg-indigo-100 text-indigo-700 p-1 rounded">🎬</span>
+                      Prep for this role
+                    </h4>
+                    <div className="relative w-full overflow-hidden rounded-xl bg-gray-100 aspect-video">
+                      <iframe
+                        className="absolute top-0 left-0 w-full h-full"
+                        src={`https://www.youtube.com/embed/${getInterviewVideoForJob(job).id}`}
+                        title={getInterviewVideoForJob(job).title}
+                        frameBorder="0"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                      ></iframe>
+                    </div>
                   </div>
                 </div>
                 
