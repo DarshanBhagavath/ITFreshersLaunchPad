@@ -8,14 +8,29 @@ const VIDEO_CATEGORIES = [
     icon: <Users className="w-5 h-5" />,
     videos: [
       {
-        id: "WtSizC0nIoQ",
-        title: "Top 10 HR Interview Questions and Answers for Freshers",
-        description: "Learn how to answer the most common HR interview questions confidently.",
+        id: "sjKcLEVhNfc",
+        title: "5 Most Common Job Interview Questions (Diksha Arora)",
+        description: "Must prepare interview questions and answers tailored for freshers.",
       },
       {
-        id: "VUzlCG_eoFs",
-        title: "How to Introduce Yourself in an Interview",
-        description: "Master the 'Tell me about yourself' question with a perfect introduction.",
+        id: "ZOc6VMhzoio",
+        title: "Crack ANY HR Interview By Doing This! (Nistha Tripathi)",
+        description: "Essential strategies to crack HR rounds easily as a fresher.",
+      },
+      {
+        id: "SZizzBvSR3k",
+        title: "Why Should We Hire You? (Diksha Arora)",
+        description: "Learn the best way to answer this tough HR question confidently.",
+      },
+      {
+        id: "VXRElBMUkMM",
+        title: "How to Greet the Interviewer? | Interview Tips",
+        description: "First impressions matter! Learn proper greeting etiquette.",
+      },
+      {
+        id: "mTvwtgbl-AU",
+        title: "The Power of Body Language (Santwinder Singh)",
+        description: "Look confident and professional during your interview with the right body language.",
       }
     ]
   },
