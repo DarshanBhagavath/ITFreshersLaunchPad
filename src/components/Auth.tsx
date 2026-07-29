@@ -71,7 +71,7 @@ export function Auth({ onAuthSuccess }: AuthProps) {
       const result = await signInWithPopup(auth, provider);
       await checkUserDocument(result.user);
     } catch (err: any) {
-      console.error(err);
+      
       let errorMessage = "Error logging in with Google";
       if (err.code === 'auth/operation-not-allowed') {
         errorMessage = "Google login is not enabled. Please enable it in the Firebase Console.";
@@ -98,13 +98,13 @@ export function Auth({ onAuthSuccess }: AuthProps) {
       await sendEmailVerification(result.user);
       await checkUserDocument(result.user);
     } catch (err: any) {
-      console.error(err);
-      let errorMessage = "Error signing up: " + (err.message || "");
-      if (err.code === 'auth/email-already-in-use') {
+      let errorMessage = "Error signing up. Please try again.";
+      if (err.code === 'auth/email-already-in-use' || (err.message && err.message.includes('email-already-in-use'))) {
         errorMessage = "This email is already registered. Please log in instead.";
-        setMode('login');
       } else if (err.code === 'auth/operation-not-allowed') {
         errorMessage = "Email/Password sign-in is not enabled. Please enable it in the Firebase Console.";
+      } else if (err.message) {
+        errorMessage = err.message;
       }
       setError(errorMessage);
     } finally {
@@ -122,7 +122,7 @@ export function Auth({ onAuthSuccess }: AuthProps) {
       const result = await signInWithEmailAndPassword(auth, email, password);
       await checkUserDocument(result.user);
     } catch (err: any) {
-      console.error(err);
+      
       let errorMessage = "Invalid email or password";
       if (err.code === 'auth/user-not-found') {
         errorMessage = "No user found with this email. Please sign up.";
@@ -153,7 +153,7 @@ export function Auth({ onAuthSuccess }: AuthProps) {
       await sendPasswordResetEmail(auth, email);
       setMessage("Password reset email sent! Check your inbox.");
     } catch (err: any) {
-      console.error(err);
+      
       setError(err.message || "Error sending reset email");
     } finally {
       setIsLoading(false);
@@ -170,7 +170,7 @@ export function Auth({ onAuthSuccess }: AuthProps) {
       await setDoc(docRef, details);
       onAuthSuccess(userAuth, details);
     } catch (error) {
-      console.error(error);
+      
       alert("Error saving details");
     } finally {
       setIsLoading(false);

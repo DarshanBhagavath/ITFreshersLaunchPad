@@ -32,7 +32,7 @@ export default function App() {
             setUserDetails(docSnap.data() as UserDetails);
           }
         } catch (error) {
-          console.error("Error fetching user details:", error);
+          
         }
       } else {
         setUser(null);
