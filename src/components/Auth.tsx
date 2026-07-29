@@ -99,9 +99,10 @@ export function Auth({ onAuthSuccess }: AuthProps) {
       await checkUserDocument(result.user);
     } catch (err: any) {
       console.error(err);
-      let errorMessage = "Error signing up";
+      let errorMessage = "Error signing up: " + (err.message || "");
       if (err.code === 'auth/email-already-in-use') {
         errorMessage = "This email is already registered. Please log in instead.";
+        setMode('login');
       } else if (err.code === 'auth/operation-not-allowed') {
         errorMessage = "Email/Password sign-in is not enabled. Please enable it in the Firebase Console.";
       }

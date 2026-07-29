@@ -18,7 +18,10 @@
         { "name": "emailId", "type": "string" },
         { "name": "address", "type": "string" },
         { "name": "highestEducation", "type": "string" },
-        { "name": "stream", "type": "string" }
+        { "name": "stream", "type": "string" },
+        { "name": "skills", "type": "string" },
+        { "name": "projects", "type": "string" },
+        { "name": "certifications", "type": "string" }
       ],
       "queries": [
         {

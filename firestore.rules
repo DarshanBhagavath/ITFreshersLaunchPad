@@ -1,4 +1,5 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
     match /{document=**} {
@@ -11,14 +12,17 @@ service cloud.firestore {
     function existing() { return resource.data; }
     
     function isValidUser(data) {
-      return data.keys().hasAll(['fullName', 'phoneNumber', 'emailId', 'address', 'highestEducation', 'stream'])
-        && data.keys().size() == 6
+      return data.keys().hasAll(['fullName', 'phoneNumber', 'emailId', 'address', 'highestEducation', 'stream', 'skills', 'projects', 'certifications'])
+        && data.keys().size() <= 9
         && data.fullName is string && data.fullName.size() <= 100
         && data.phoneNumber is string && data.phoneNumber.size() <= 20
         && data.emailId is string && data.emailId.size() <= 100
         && data.address is string && data.address.size() <= 200
         && data.highestEducation is string && data.highestEducation.size() <= 100
-        && data.stream is string && data.stream.size() <= 100;
+        && data.stream is string && data.stream.size() <= 100
+        && data.skills is string && data.skills.size() <= 5000
+        && data.projects is string && data.projects.size() <= 5000
+        && data.certifications is string && data.certifications.size() <= 5000;
     }
 
     match /users/{userId} {
