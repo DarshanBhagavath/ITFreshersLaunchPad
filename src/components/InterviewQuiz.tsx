@@ -2,11 +2,13 @@ import React, { useState } from 'react';
 import { quizQuestions } from '../data/quizQuestions';
 import { BookOpen, CheckCircle, XCircle, ArrowRight, ArrowLeft, RefreshCw, Award } from 'lucide-react';
 
-type Skill = 'Java' | 'Python' | 'SQL' | 'React';
-const SKILLS: Skill[] = ['Java', 'Python', 'SQL', 'React'];
+type Skill = string;
+const SKILLS: Skill[] = ['Java', 'Python', 'SQL', 'React', 'HTML', 'CSS', 'JavaScript', '.NET', 'C#', 'AI', 'Data Analytics', 'DevOps', 'Cloud', 'Power BI'];
 
 export function InterviewQuiz() {
   const [selectedSkill, setSelectedSkill] = useState<Skill | null>(null);
+  const [currentSkillsPage, setCurrentSkillsPage] = useState(1);
+  const SKILLS_PER_PAGE = 5;
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [isSubmitted, setIsSubmitted] = useState(false);

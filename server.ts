@@ -118,6 +118,7 @@ app.get("/api/jobs", async (req, res) => {
   }
 });
 
+
 app.post("/api/generate-resume", async (req, res) => {
   try {
     const { userDetails, jobDescription } = req.body;

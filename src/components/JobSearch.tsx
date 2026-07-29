@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Job, UserDetails } from "../types";
-import { MapPin, Building, Briefcase, FileSignature, Loader2, AlertCircle, ChevronLeft, ChevronRight, ExternalLink } from "lucide-react";
+import { MapPin, Building, Briefcase, FileSignature, Loader2, AlertCircle, ChevronLeft, ChevronRight, ExternalLink, ArrowLeft } from "lucide-react";
 import { ResumeBuilder } from "./ResumeBuilder";
 
 interface JobSearchProps {
@@ -9,33 +9,10 @@ interface JobSearchProps {
 
 const ITEMS_PER_PAGE = 10;
 
-const getInterviewVideoForJob = (job: Job) => {
-  const textToSearch = `${job.title} ${job.description} ${job.tags.join(" ")}`.toLowerCase();
-  
-  if (textToSearch.includes("java") && !textToSearch.includes("javascript")) {
-    return { id: "4Ib9amXl4gI", title: "Java Interview Questions for Freshers" };
-  }
-  if (textToSearch.includes("python")) {
-    return { id: "0K_eZGS5NsU", title: "Python Interview Questions for Freshers" };
-  }
-  if (textToSearch.includes("react")) {
-    return { id: "YvB1F32CTLg", title: "React Interview Questions for Freshers" };
-  }
-  if (textToSearch.includes("sql") || textToSearch.includes("database")) {
-    return { id: "oX5Y26O5dBE", title: "SQL Interview Questions for Freshers" };
-  }
-  if (textToSearch.includes("javascript") || textToSearch.includes("node")) {
-    return { id: "kUTbEcO-lrk", title: "JavaScript Interview Questions for Freshers" };
-  }
-  if (textToSearch.includes("c++") || textToSearch.includes("cpp")) {
-    return { id: "6HuptuHyJZg", title: "C++ Interview Questions for Freshers" };
-  }
-  return { id: "WwYwQyTOiOk", title: "IT Interview Questions for Freshers" };
-};
-
 export function JobSearch({ userDetails }: JobSearchProps) {
   const [selectedLocation, setSelectedLocation] = useState<string>("India");
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
+  const [viewingJob, setViewingJob] = useState<Job | null>(null);
   const [allLiveJobs, setAllLiveJobs] = useState<Job[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -145,6 +122,82 @@ export function JobSearch({ userDetails }: JobSearchProps) {
     return Array.from(locSet).sort((a, b) => a.localeCompare(b));
   }, [allLiveJobs]);
 
+  if (viewingJob) {
+    return (
+      <div className="max-w-4xl mx-auto py-8 px-4">
+        <button
+          onClick={() => setViewingJob(null)}
+          className="text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-2 mb-6"
+        >
+          <ArrowLeft className="w-5 h-5" /> Back to Jobs
+        </button>
+
+        <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
+          <div className="p-8 border-b border-gray-100">
+            <div className="inline-block px-3 py-1 bg-green-50 text-green-700 text-sm font-semibold rounded-full mb-4">
+              Fresher (0-1 yrs)
+            </div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-4">{viewingJob.title}</h1>
+            
+            <div className="flex flex-wrap items-center gap-6 text-gray-600">
+              <div className="flex items-center gap-2">
+                <Building className="w-5 h-5 text-gray-400" />
+                <span className="font-medium text-lg">{viewingJob.company}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <MapPin className="w-5 h-5 text-gray-400" />
+                <span className="text-lg">{viewingJob.location}</span>
+              </div>
+            </div>
+          </div>
+          
+          <div className="p-8">
+            <h3 className="text-xl font-bold text-gray-900 mb-4">Job Description</h3>
+            <div className="prose max-w-none text-gray-600 leading-relaxed">
+              <p className="whitespace-pre-wrap">{viewingJob.description}</p>
+            </div>
+            
+            <div className="mt-8">
+              <h4 className="text-lg font-medium text-gray-900 mb-3">Tags & Skills</h4>
+              <div className="flex flex-wrap gap-2">
+                {viewingJob.tags.map((tag, idx) => (
+                  <span key={idx} className="bg-gray-100 text-gray-700 px-3 py-1.5 rounded-md text-sm font-medium border border-gray-200">
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+          
+          <div className="p-8 bg-gray-50 flex flex-col sm:flex-row gap-4 border-t border-gray-100">
+            {viewingJob.applyUrl && (
+              <a
+                href={viewingJob.applyUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1 flex items-center justify-center gap-2 bg-indigo-600 text-white font-semibold py-3.5 px-6 rounded-xl hover:bg-indigo-700 transition-colors shadow-sm text-lg"
+              >
+                <ExternalLink className="w-5 h-5" />
+                Apply on Company Website
+              </a>
+            )}
+            <button 
+              onClick={() => setSelectedJob(viewingJob)}
+              className="flex-1 flex items-center justify-center gap-2 bg-white text-indigo-700 font-semibold py-3.5 px-6 rounded-xl hover:bg-indigo-50 transition-colors border border-indigo-200 text-lg shadow-sm"
+            >
+              <FileSignature className="w-5 h-5" />
+              Create Tailored Resume
+            </button>
+          </div>
+        </div>
+
+        {selectedJob && (
+          <ResumeBuilder job={selectedJob} userDetails={userDetails} onClose={() => setSelectedJob(null)} />
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-6xl mx-auto py-8 px-4">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
@@ -225,44 +278,14 @@ export function JobSearch({ userDetails }: JobSearchProps) {
                       </span>
                     ))}
                   </div>
-
-                  {/* Interview Video Section */}
-                  <div className="mt-6 border-t border-gray-100 pt-4">
-                    <h4 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                      <span className="bg-indigo-100 text-indigo-700 p-1 rounded">🎬</span>
-                      Prep for this role
-                    </h4>
-                    <div className="relative w-full overflow-hidden rounded-xl bg-gray-100 aspect-video">
-                      <iframe
-                        className="absolute top-0 left-0 w-full h-full"
-                        src={`https://www.youtube.com/embed/${getInterviewVideoForJob(job).id}`}
-                        title={getInterviewVideoForJob(job).title}
-                        frameBorder="0"
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                        allowFullScreen
-                      ></iframe>
-                    </div>
-                  </div>
                 </div>
                 
-                <div className="p-6 pt-0 mt-auto flex flex-col gap-3">
-                  {job.applyUrl && (
-                    <a
-                      href={job.applyUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="w-full flex items-center justify-center gap-2 bg-indigo-600 text-white font-semibold py-3 rounded-xl hover:bg-indigo-700 transition-colors shadow-sm"
-                    >
-                      <ExternalLink className="w-4 h-4" />
-                      Apply Now
-                    </a>
-                  )}
+                <div className="p-6 pt-0 mt-auto">
                   <button 
-                    onClick={() => setSelectedJob(job)}
+                    onClick={() => setViewingJob(job)}
                     className="w-full flex items-center justify-center gap-2 bg-indigo-50 text-indigo-700 font-semibold py-3 rounded-xl hover:bg-indigo-600 hover:text-white transition-colors border border-indigo-100 hover:border-transparent"
                   >
-                    <FileSignature className="w-4 h-4" />
-                    Create Tailored Resume
+                    View Job Details
                   </button>
                 </div>
               </div>

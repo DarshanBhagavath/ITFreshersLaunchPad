@@ -1,6 +1,6 @@
 const fs = require('fs');
 
-const skills = ['Java', 'Python', 'SQL', 'React'];
+const skills = ['Java', 'Python', 'SQL', 'React', 'HTML', 'CSS', 'JavaScript', '.NET', 'C#', 'AI', 'Data Analytics', 'DevOps', 'Cloud', 'Power BI'];
 const data = {};
 
 const generateQuestions = (skill) => {
