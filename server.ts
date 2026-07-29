@@ -136,17 +136,20 @@ Email: ${userDetails.emailId}
 Address: ${userDetails.address}
 Highest Education: ${userDetails.highestEducation}
 Stream/Major: ${userDetails.stream}
+Skills: ${userDetails.skills || "None provided"}
+Projects: ${userDetails.projects || "None provided"}
+Certifications: ${userDetails.certifications || "None provided"}
 
 Here is the job description they are applying for:
 ${jobDescription}
 
 Please generate the content for a tailored resume. Include:
 1. Contact Information
-2. Professional Summary (tailored to the job description)
+2. Professional Summary (tailored to the job description and leveraging their provided skills/experience)
 3. Education
-4. Skills (Highlight skills relevant to the job description, assuming standard skills for a fresher in this stream)
-5. Projects / Academic Experience (Invent 2-3 plausible academic projects that fit their stream and the job requirements)
-6. Certifications or Extracurriculars (plausible general ones)
+4. Skills (Highlight provided skills relevant to the job description, add standard skills if needed)
+5. Projects / Academic Experience (use the provided projects, adapt them to the job if possible)
+6. Certifications (use the provided certifications)
 
 Output the resume entirely in Markdown format. Do NOT wrap it in a code block or use \`\`\`markdown, just output the raw Markdown text.`;
 

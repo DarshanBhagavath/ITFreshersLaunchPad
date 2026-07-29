@@ -37,6 +37,9 @@ export function Auth({ onAuthSuccess }: AuthProps) {
     address: "",
     highestEducation: "",
     stream: "",
+    skills: "",
+    projects: "",
+    certifications: "",
   });
 
   const checkUserDocument = async (user: any) => {
@@ -45,7 +48,14 @@ export function Auth({ onAuthSuccess }: AuthProps) {
     
     if (docSnap.exists()) {
       const userData = docSnap.data() as UserDetails;
-      onAuthSuccess(user, userData);
+      if (!userData.skills && userData.skills !== "") {
+        // Needs update
+        setUserAuth(user);
+        setDetails({ ...userData, skills: "", projects: "", certifications: "" });
+        setMode('complete_profile');
+      } else {
+        onAuthSuccess(user, userData);
+      }
     } else {
       setUserAuth(user);
       setDetails(prev => ({ ...prev, emailId: user.email || '', fullName: user.displayName || '' }));
@@ -166,7 +176,7 @@ export function Auth({ onAuthSuccess }: AuthProps) {
     }
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setDetails({ ...details, [e.target.name]: e.target.value });
   };
 
@@ -206,9 +216,22 @@ export function Auth({ onAuthSuccess }: AuthProps) {
                 <input required type="text" name="highestEducation" value={details.highestEducation} onChange={handleChange} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="B.E. / B.Tech" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Stream</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Stream / Major</label>
                 <input required type="text" name="stream" value={details.stream} onChange={handleChange} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Computer Science" />
               </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Skill Sets</label>
+              <textarea name="skills" value={details.skills} onChange={handleChange as any} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="React, Node.js, Python..." rows={2}></textarea>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Projects</label>
+              <textarea name="projects" value={details.projects} onChange={handleChange as any} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Details about your academic or personal projects..." rows={2}></textarea>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Certifications</label>
+              <textarea name="certifications" value={details.certifications} onChange={handleChange as any} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="AWS Certified, Coursera..." rows={2}></textarea>
             </div>
             <button 
               type="submit" 

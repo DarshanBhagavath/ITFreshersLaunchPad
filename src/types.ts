@@ -5,6 +5,9 @@ export interface UserDetails {
   address: string;
   highestEducation: string;
   stream: string;
+  skills: string;
+  projects: string;
+  certifications: string;
 }
 
 export interface Job {

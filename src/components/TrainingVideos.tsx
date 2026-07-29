@@ -125,7 +125,7 @@ const VIDEO_CATEGORIES: VideoCategory[] = [
   }
 ];
 
-const ITEMS_PER_PAGE = 5;
+const ITEMS_PER_PAGE = 6;
 
 export function TrainingVideos() {
   const [activeCategory, setActiveCategory] = useState(VIDEO_CATEGORIES[0].id);
