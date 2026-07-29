@@ -7,7 +7,7 @@ interface JobSearchProps {
   userDetails: UserDetails;
 }
 
-const ITEMS_PER_PAGE = 10;
+const ITEMS_PER_PAGE = 9;
 
 export function JobSearch({ userDetails }: JobSearchProps) {
   const [selectedLocation, setSelectedLocation] = useState<string>("India");
