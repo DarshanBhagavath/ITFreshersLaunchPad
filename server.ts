@@ -139,12 +139,13 @@ Stream/Major: ${userDetails.stream}
 Skills: ${userDetails.skills || "None provided"}
 Projects: ${userDetails.projects || "None provided"}
 Certifications: ${userDetails.certifications || "None provided"}
+LinkedIn: ${userDetails.linkedInUrl || "None provided"}
 
 Here is the job description they are applying for:
 ${jobDescription}
 
 Please generate the content for a tailored resume. Include:
-1. Contact Information
+1. Contact Information (include LinkedIn URL if provided)
 2. Professional Summary (tailored to the job description and leveraging their provided skills/experience)
 3. Education
 4. Skills (Highlight provided skills relevant to the job description, add standard skills if needed)
@@ -154,7 +155,7 @@ Please generate the content for a tailored resume. Include:
 Output the resume entirely in Markdown format. Do NOT wrap it in a code block or use \`\`\`markdown, just output the raw Markdown text.`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.6-flash",
+      model: "gemini-3.5-flash-lite",
       contents: prompt,
     });
 
@@ -188,7 +189,7 @@ ${editedText}
 Your task is to re-apply the original Markdown formatting (headers, bolding, bullet points) to the edited text. Preserve the user's edits, but restore the rich markdown structure. Output ONLY the raw Markdown text, without any \`\`\`markdown wrappers or extra text.`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.6-flash",
+      model: "gemini-3.5-flash-lite",
       contents: prompt,
     });
 
@@ -223,14 +224,14 @@ app.post("/api/generate-interview-question", async (req, res) => {
     Output ONLY the question text without any markdown, quotes, or prefix.`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.6-flash",
+      model: "gemini-3.5-flash-lite",
       contents: prompt,
     });
 
     res.json({ question: response.text.trim() });
   } catch (error) {
     console.error("Error generating question:", error);
-    res.status(500).json({ error: "Failed to generate interview question" });
+    res.status(500).json({ error: "Failed: " + error.message });
   }
 });
 
@@ -252,14 +253,24 @@ app.post("/api/evaluate-interview-answer", async (req, res) => {
     Point out what they did well, and what they could improve or missed.
     Do not be overly harsh, but be honest and helpful for a fresher.
     
-    Output your feedback clearly, using a friendly and encouraging tone.`;
+    Return a valid JSON object with two fields: "feedback" (string, 2-4 sentences) and "score" (number, out of 10). Do not include markdown formatting or backticks.`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.6-flash",
+      model: "gemini-3.5-flash-lite",
       contents: prompt,
     });
 
-    res.json({ feedback: response.text.trim() });
+    
+    let result;
+    try {
+      const cleanedText = response.text.replace(/\n/g, '').replace(/```json/g, '').replace(/```/g, '').trim();
+      result = JSON.parse(cleanedText);
+    } catch (e) {
+      // Fallback
+      result = { feedback: response.text.trim(), score: 5 };
+    }
+    res.json(result);
+
   } catch (error) {
     console.error("Error evaluating answer:", error);
     res.status(500).json({ error: "Failed to evaluate answer" });

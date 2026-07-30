@@ -1,7 +1,7 @@
 const fs = require('fs');
 let content = fs.readFileSync('src/components/MockInterview.tsx', 'utf-8');
 
-const newComponentCode = `function ActiveInterview({ sectionTitle, onClose }: ActiveInterviewProps) {
+const newComponentCode = `function ActiveInterview({ sectionTitle, onClose }: { sectionTitle: string, onClose: () => void }) {
   const [loading, setLoading] = useState(false);
   const [question, setQuestion] = useState("");
   const [previousQuestions, setPreviousQuestions] = useState<string[]>([]);
@@ -9,16 +9,18 @@ const newComponentCode = `function ActiveInterview({ sectionTitle, onClose }: Ac
   const [isRecording, setIsRecording] = useState(false);
   const [feedback, setFeedback] = useState("");
   const [prefetchedQuestion, setPrefetchedQuestion] = useState("");
+  const [isPrefetching, setIsPrefetching] = useState(false);
   
   const recognitionRef = useRef<any>(null);
   const existingTextRef = useRef("");
-  const fetchedRef = useRef(false);
+  
+  // A ref to keep track of the current question so background fetches can use it
+  const currentQuestionRef = useRef("");
 
   useEffect(() => {
     let isMounted = true;
     
     const fetchFirstQuestion = async () => {
-      if (!isMounted) return;
       setLoading(true);
       setFeedback("");
       setTranscript("");
@@ -37,6 +39,7 @@ const newComponentCode = `function ActiveInterview({ sectionTitle, onClose }: Ac
         
         if (data.question) {
           setQuestion(data.question);
+          currentQuestionRef.current = data.question;
           setPreviousQuestions([data.question]);
           speakText(data.question);
         }
@@ -47,27 +50,25 @@ const newComponentCode = `function ActiveInterview({ sectionTitle, onClose }: Ac
       }
     };
 
-    if (!fetchedRef.current) {
-      fetchedRef.current = true;
-      fetchFirstQuestion();
-    }
+    fetchFirstQuestion();
     
     return () => {
       isMounted = false;
       if (recognitionRef.current) {
-        try {
-          recognitionRef.current.stop();
-        } catch(e){}
+        try { recognitionRef.current.stop(); } catch(e){}
       }
       window.speechSynthesis.cancel();
     };
-  }, [sectionTitle]);
+  }, [sectionTitle]); // Re-fetch only when sectionTitle changes
 
   const fetchQuestion = async () => {
+    // Navigate to next question quickly if prefetched
     if (prefetchedQuestion) {
       setQuestion(prefetchedQuestion);
+      currentQuestionRef.current = prefetchedQuestion;
       setPreviousQuestions(prev => [...prev, prefetchedQuestion]);
       speakText(prefetchedQuestion);
+      
       setPrefetchedQuestion("");
       setFeedback("");
       setTranscript("");
@@ -75,7 +76,9 @@ const newComponentCode = `function ActiveInterview({ sectionTitle, onClose }: Ac
       return;
     }
 
+    // Fallback if not prefetched
     setLoading(true);
+    setQuestion("");
     setFeedback("");
     setTranscript("");
     existingTextRef.current = "";
@@ -90,6 +93,7 @@ const newComponentCode = `function ActiveInterview({ sectionTitle, onClose }: Ac
       
       if (data.question) {
         setQuestion(data.question);
+        currentQuestionRef.current = data.question;
         setPreviousQuestions(prev => [...prev, data.question]);
         speakText(data.question);
       }
@@ -120,9 +124,7 @@ const newComponentCode = `function ActiveInterview({ sectionTitle, onClose }: Ac
     }
 
     if (recognitionRef.current) {
-        try {
-          recognitionRef.current.stop();
-        } catch(e){}
+        try { recognitionRef.current.stop(); } catch(e){}
     }
 
     const recognition = new SpeechRecognition();
@@ -178,9 +180,7 @@ const newComponentCode = `function ActiveInterview({ sectionTitle, onClose }: Ac
   const toggleRecording = () => {
     if (isRecording) {
       if (recognitionRef.current) {
-        try {
-          recognitionRef.current.stop();
-        } catch(e){}
+        try { recognitionRef.current.stop(); } catch(e){}
       }
       setIsRecording(false);
     } else {
@@ -199,24 +199,30 @@ const newComponentCode = `function ActiveInterview({ sectionTitle, onClose }: Ac
       setIsRecording(false);
     }
     
-    try {
-      fetch("/api/generate-interview-question", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sectionTitle, previousQuestions: [...previousQuestions, question] })
-      })
-      .then(res => res.json())
-      .then(data => {
-        if (data.question) {
-          setPrefetchedQuestion(data.question);
-        }
-      })
-      .catch(err => console.error("Prefetch error:", err));
+    // Background prefetch for next question
+    setIsPrefetching(true);
+    fetch("/api/generate-interview-question", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sectionTitle, previousQuestions: [...previousQuestions, currentQuestionRef.current] })
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.question) {
+        setPrefetchedQuestion(data.question);
+      }
+      setIsPrefetching(false);
+    })
+    .catch(err => {
+      console.error("Prefetch error:", err);
+      setIsPrefetching(false);
+    });
 
+    try {
       const res = await fetch("/api/evaluate-interview-answer", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sectionTitle, question, answer: transcript })
+        body: JSON.stringify({ sectionTitle, question: currentQuestionRef.current, answer: transcript })
       });
       const data = await res.json();
       
@@ -336,11 +342,11 @@ const newComponentCode = `function ActiveInterview({ sectionTitle, onClose }: Ac
             <div className="flex justify-end">
               <button
                 onClick={fetchQuestion}
-                disabled={loading}
-                className="flex items-center gap-2 bg-indigo-600 text-white px-6 py-2.5 rounded-lg font-medium hover:bg-indigo-700 transition-colors"
+                disabled={loading || isPrefetching}
+                className="flex items-center gap-2 bg-indigo-600 text-white px-6 py-2.5 rounded-lg font-medium hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Next Question
-                {prefetchedQuestion ? null : (loading ? <Loader2 className="w-4 h-4 animate-spin" /> : null)}
+                {isPrefetching || loading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
               </button>
             </div>
           </div>

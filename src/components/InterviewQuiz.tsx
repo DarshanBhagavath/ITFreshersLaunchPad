@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { quizQuestions } from '../data/quizQuestions';
+import { db } from "../lib/firebase";
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { BookOpen, CheckCircle, XCircle, ArrowRight, ArrowLeft, RefreshCw, Award } from 'lucide-react';
 
 type Skill = string;
 const SKILLS: Skill[] = ['Java', 'Python', 'SQL', 'React', 'HTML', 'CSS', 'JavaScript', '.NET', 'C#', 'AI', 'Data Analytics', 'DevOps', 'Cloud', 'Power BI'];
 
-export function InterviewQuiz() {
+export function InterviewQuiz({ user }: { user: any }) {
   const [selectedSkill, setSelectedSkill] = useState<Skill | null>(null);
   const [currentSkillsPage, setCurrentSkillsPage] = useState(1);
   const SKILLS_PER_PAGE = 5;
@@ -36,8 +38,28 @@ export function InterviewQuiz() {
     }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     setIsSubmitted(true);
+    let score = 0;
+    const questions = quizQuestions[selectedSkill!];
+    questions.forEach((q) => {
+      if (answers[q.id] === q.correctAnswer) {
+        score += 1;
+      }
+    });
+    
+    if (user) {
+      try {
+        await addDoc(collection(db, "users", user.uid, "quizAttempts"), {
+          skill: selectedSkill,
+          score,
+          total: questions.length,
+          timestamp: serverTimestamp()
+        });
+      } catch (err) {
+        console.error("Error saving quiz attempt:", err);
+      }
+    }
   };
 
   const handleRetake = () => {

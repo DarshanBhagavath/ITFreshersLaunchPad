@@ -40,6 +40,7 @@ export function Auth({ onAuthSuccess }: AuthProps) {
     skills: "",
     projects: "",
     certifications: "",
+    linkedInUrl: "",
   });
 
   const checkUserDocument = async (user: any) => {
@@ -229,6 +230,11 @@ export function Auth({ onAuthSuccess }: AuthProps) {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Projects</label>
               <textarea name="projects" value={details.projects} onChange={handleChange as any} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Details about your academic or personal projects..." rows={2}></textarea>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">LinkedIn Profile URL</label>
+              <input type="url" name="linkedInUrl" value={details.linkedInUrl || ''} onChange={handleChange} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="https://linkedin.com/in/yourprofile" />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Certifications</label>

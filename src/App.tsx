@@ -151,8 +151,8 @@ export default function App() {
         {activeTab === "roadmap" && <Roadmap />}
         {activeTab === "jobs" && <JobSearch userDetails={userDetails} />}
         {activeTab === "training" && <TrainingVideos />}
-        {activeTab === "quiz" && <InterviewQuiz />}
-        {activeTab === "mock_interview" && <MockInterview />}
+        {activeTab === "quiz" && <InterviewQuiz user={user} />}
+        {activeTab === "mock_interview" && <MockInterview user={user} />}
       </main>
     </div>
   );

@@ -8,6 +8,7 @@ export interface UserDetails {
   skills: string;
   projects: string;
   certifications: string;
+  linkedInUrl?: string;
 }
 
 export interface Job {

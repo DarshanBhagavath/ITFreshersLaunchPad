@@ -1,4 +1,7 @@
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar } from "recharts";
 import React, { useState, useEffect, useRef } from 'react';
+import { db } from "../lib/firebase";
+import { collection, addDoc, serverTimestamp, query, orderBy, getDocs } from "firebase/firestore";
 import { ChevronDown, ChevronUp, BookOpen, Code, Terminal, Users, CheckCircle2, Play, Mic, MicOff, Send, Loader2, StopCircle } from 'lucide-react';
 
 interface ActiveInterviewProps {
@@ -6,74 +9,34 @@ interface ActiveInterviewProps {
   onClose: () => void;
 }
 
-function ActiveInterview({ sectionTitle, onClose }: ActiveInterviewProps) {
+function ActiveInterview({ sectionTitle, onClose, user }: { sectionTitle: string, onClose: () => void, user: any }) {
   const [loading, setLoading] = useState(false);
   const [question, setQuestion] = useState("");
   const [previousQuestions, setPreviousQuestions] = useState<string[]>([]);
   const [transcript, setTranscript] = useState("");
   const [isRecording, setIsRecording] = useState(false);
   const [feedback, setFeedback] = useState("");
+  const [prefetchedQuestion, setPrefetchedQuestion] = useState("");
+  const [isPrefetching, setIsPrefetching] = useState(false);
   
   const recognitionRef = useRef<any>(null);
   const existingTextRef = useRef("");
-  const fetchedRef = useRef(false);
+  const latestTranscriptRef = useRef("");
+  const isIntendedRecordingRef = useRef(false);
+  
+  // A ref to keep track of the current question so background fetches can use it
+  const currentQuestionRef = useRef("");
 
   useEffect(() => {
     let isMounted = true;
     
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (SpeechRecognition) {
-      const recognition = new SpeechRecognition();
-      recognition.continuous = true;
-      recognition.interimResults = true;
-      recognition.lang = 'en-US';
-
-      recognition.onstart = () => {
-        if (isMounted) setIsRecording(true);
-      };
-
-      recognition.onresult = (event: any) => {
-        let interimTranscript = '';
-        let finalTranscript = '';
-
-        for (let i = event.resultIndex; i < event.results.length; ++i) {
-          if (event.results[i].isFinal) {
-            finalTranscript += event.results[i][0].transcript;
-          } else {
-            interimTranscript += event.results[i][0].transcript;
-          }
-        }
-        
-        if (finalTranscript !== '') {
-          const base = existingTextRef.current;
-          existingTextRef.current = base + (base && !base.endsWith(' ') ? ' ' : '') + finalTranscript;
-        }
-        
-        if (isMounted) {
-          const currentBase = existingTextRef.current;
-          setTranscript(currentBase + (currentBase && interimTranscript && !currentBase.endsWith(' ') ? ' ' : '') + interimTranscript);
-        }
-      };
-
-      recognition.onerror = (event: any) => {
-        if (event.error === 'no-speech') return;
-        console.error("Speech recognition error", event.error);
-        if (isMounted) setIsRecording(false);
-      };
-
-      recognition.onend = () => {
-        if (isMounted) setIsRecording(false);
-      };
-
-      recognitionRef.current = recognition;
-    }
-    
     const fetchFirstQuestion = async () => {
-      if (!isMounted) return;
       setLoading(true);
       setFeedback("");
       setTranscript("");
       existingTextRef.current = "";
+      latestTranscriptRef.current = "";
+      setPrefetchedQuestion("");
       
       try {
         const res = await fetch("/api/generate-interview-question", {
@@ -87,6 +50,7 @@ function ActiveInterview({ sectionTitle, onClose }: ActiveInterviewProps) {
         
         if (data.question) {
           setQuestion(data.question);
+          currentQuestionRef.current = data.question;
           setPreviousQuestions([data.question]);
           speakText(data.question);
         }
@@ -97,25 +61,50 @@ function ActiveInterview({ sectionTitle, onClose }: ActiveInterviewProps) {
       }
     };
 
-    if (!fetchedRef.current) {
-      fetchedRef.current = true;
-      fetchFirstQuestion();
-    }
+    fetchFirstQuestion();
     
     return () => {
       isMounted = false;
+      isIntendedRecordingRef.current = false;
       if (recognitionRef.current) {
-        recognitionRef.current.stop();
+        try { recognitionRef.current.stop(); } catch(e){}
       }
       window.speechSynthesis.cancel();
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [sectionTitle]); // Re-fetch only when sectionTitle changes
 
   const fetchQuestion = async () => {
+    // Stop recording if active
+    if (isRecording) {
+      isIntendedRecordingRef.current = false;
+      if (recognitionRef.current) {
+        try { recognitionRef.current.stop(); } catch(e){}
+      }
+      setIsRecording(false);
+    }
+    
+    // Navigate to next question quickly if prefetched
+    if (prefetchedQuestion) {
+      setQuestion(prefetchedQuestion);
+      currentQuestionRef.current = prefetchedQuestion;
+      setPreviousQuestions(prev => [...prev, prefetchedQuestion]);
+      speakText(prefetchedQuestion);
+      
+      setPrefetchedQuestion("");
+      setFeedback("");
+      setTranscript("");
+      existingTextRef.current = "";
+      latestTranscriptRef.current = "";
+      return;
+    }
+
+    // Fallback if not prefetched
     setLoading(true);
+    setQuestion("");
     setFeedback("");
     setTranscript("");
     existingTextRef.current = "";
+    latestTranscriptRef.current = "";
     
     try {
       const res = await fetch("/api/generate-interview-question", {
@@ -127,6 +116,7 @@ function ActiveInterview({ sectionTitle, onClose }: ActiveInterviewProps) {
       
       if (data.question) {
         setQuestion(data.question);
+        currentQuestionRef.current = data.question;
         setPreviousQuestions(prev => [...prev, data.question]);
         speakText(data.question);
       }
@@ -147,22 +137,84 @@ function ActiveInterview({ sectionTitle, onClose }: ActiveInterviewProps) {
   const handleTranscriptChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setTranscript(e.target.value);
     existingTextRef.current = e.target.value;
+    latestTranscriptRef.current = e.target.value;
+  };
+
+  const startRecording = () => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert("Speech recognition is not supported in this browser. Please type your answer.");
+      return;
+    }
+
+    isIntendedRecordingRef.current = true;
+
+    if (recognitionRef.current) {
+        try { recognitionRef.current.stop(); } catch(e){}
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = 'en-US';
+
+    recognition.onstart = () => {
+      setIsRecording(true);
+    };
+
+    recognition.onresult = (event: any) => {
+      let sessionTranscript = '';
+      for (let i = 0; i < event.results.length; ++i) {
+        sessionTranscript += event.results[i][0].transcript;
+      }
+      
+      const currentText = (existingTextRef.current + ' ' + sessionTranscript).trim();
+      setTranscript(currentText);
+      latestTranscriptRef.current = currentText;
+    };
+
+    recognition.onerror = (event: any) => {
+      if (event.error === 'no-speech') return;
+      console.error("Speech recognition error", event.error);
+      setIsRecording(false);
+      isIntendedRecordingRef.current = false;
+    };
+
+    recognition.onend = () => {
+      if (isIntendedRecordingRef.current) {
+        existingTextRef.current = latestTranscriptRef.current;
+        try {
+          recognition.start();
+        } catch (e) {
+          setIsRecording(false);
+        }
+      } else {
+        setIsRecording(false);
+      }
+    };
+
+    recognitionRef.current = recognition;
+    
+    try {
+      existingTextRef.current = transcript;
+      latestTranscriptRef.current = transcript;
+      recognition.start();
+    } catch (e) {
+      console.error(e);
+      setIsRecording(false);
+      isIntendedRecordingRef.current = false;
+    }
   };
 
   const toggleRecording = () => {
     if (isRecording) {
-      recognitionRef.current?.stop();
-    } else {
+      isIntendedRecordingRef.current = false;
       if (recognitionRef.current) {
-        try {
-          existingTextRef.current = transcript;
-          recognitionRef.current.start();
-        } catch (e) {
-          console.error(e);
-        }
-      } else {
-        alert("Speech recognition is not supported in this browser. Please type your answer.");
+        try { recognitionRef.current.stop(); } catch(e){}
       }
+      setIsRecording(false);
+    } else {
+      startRecording();
     }
   };
 
@@ -171,21 +223,58 @@ function ActiveInterview({ sectionTitle, onClose }: ActiveInterviewProps) {
     
     setLoading(true);
     if (isRecording) {
-      recognitionRef.current?.stop();
+      isIntendedRecordingRef.current = false;
+      if (recognitionRef.current) {
+        try { recognitionRef.current.stop(); } catch(e){}
+      }
       setIsRecording(false);
     }
     
+    // Background prefetch for next question
+    setIsPrefetching(true);
+    fetch("/api/generate-interview-question", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sectionTitle, previousQuestions: [...previousQuestions, currentQuestionRef.current] })
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.question) {
+        setPrefetchedQuestion(data.question);
+      }
+      setIsPrefetching(false);
+    })
+    .catch(err => {
+      console.error("Prefetch error:", err);
+      setIsPrefetching(false);
+    });
+
     try {
       const res = await fetch("/api/evaluate-interview-answer", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sectionTitle, question, answer: transcript })
+        body: JSON.stringify({ sectionTitle, question: currentQuestionRef.current, answer: transcript })
       });
       const data = await res.json();
       
       if (data.feedback) {
         setFeedback(data.feedback);
         speakText("Here is my feedback. " + data.feedback);
+        
+        if (user) {
+          try {
+            addDoc(collection(db, "users", user.uid, "interviewAttempts"), {
+              sectionTitle,
+              question: currentQuestionRef.current,
+              answer: transcript,
+              feedback: data.feedback,
+              score: data.score || 0,
+              timestamp: serverTimestamp()
+            });
+          } catch(e) {
+            console.error("Error saving attempt", e);
+          }
+        }
       }
     } catch (err) {
       console.error(err);
@@ -247,7 +336,7 @@ function ActiveInterview({ sectionTitle, onClose }: ActiveInterviewProps) {
 
         {/* Answer Area */}
         {question && !feedback && (
-          <div className="space-y-4">
+        <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h4 className="font-semibold text-gray-700">Your Answer</h4>
               <button
@@ -270,12 +359,19 @@ function ActiveInterview({ sectionTitle, onClose }: ActiveInterviewProps) {
             <textarea
               value={transcript}
               onChange={handleTranscriptChange}
-              placeholder="Your answer will appear here as you speak, or you can type it manually..."
+              placeholder="You can type it manually to evaluate an answer..."
               className="w-full h-32 px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none resize-none"
               disabled={loading}
             />
             
-            <div className="flex justify-end">
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={fetchQuestion}
+                disabled={loading}
+                className="flex items-center gap-2 bg-white border border-gray-300 text-gray-700 px-6 py-2.5 rounded-lg font-medium hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Skip / Next Question
+              </button>
               <button
                 onClick={submitAnswer}
                 disabled={!transcript.trim() || loading}
@@ -299,10 +395,11 @@ function ActiveInterview({ sectionTitle, onClose }: ActiveInterviewProps) {
             <div className="flex justify-end">
               <button
                 onClick={fetchQuestion}
-                disabled={loading}
-                className="bg-white border border-gray-300 text-gray-700 px-6 py-2 rounded-lg font-medium hover:bg-gray-50 transition-colors"
+                disabled={loading || isPrefetching}
+                className="flex items-center gap-2 bg-indigo-600 text-white px-6 py-2.5 rounded-lg font-medium hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Next Question
+                {isPrefetching || loading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
               </button>
             </div>
           </div>
@@ -312,9 +409,250 @@ function ActiveInterview({ sectionTitle, onClose }: ActiveInterviewProps) {
   );
 }
 
-export function MockInterview() {
+const technicalSkillSets = {
+  "General Software Engineering (Default)": {
+    points: [
+      "Core subject questions covering Object-Oriented Programming (OOPs), Database Management (SQL), and your preferred programming language.",
+      "Live troubleshooting or minor coding exercises to see how you think under pressure.",
+      "For tips on how to approach technical questions and explain your logic clearly during this stage: Search for 'Technical Interview Questions for Freshers' on YouTube."
+    ],
+    questions: [
+      "Explain the four pillars of OOPs with real-world examples.",
+      "What is the difference between TRUNCATE, DELETE, and DROP in SQL?",
+      "Explain your final year project. What challenges did you face and how did you overcome them?",
+      "Write code to detect a loop in a linked list."
+    ]
+  },
+  "Full Stack Web Development": {
+    points: [
+      "Core web technologies: HTML, CSS, JavaScript.",
+      "Frontend frameworks like React, Angular, or Vue.",
+      "Backend technologies like Node.js, Python, or Java.",
+      "Database management (SQL and NoSQL)."
+    ],
+    questions: [
+      "Explain the difference between client-side and server-side rendering.",
+      "What is the Virtual DOM in React?",
+      "How do you design a RESTful API?",
+      "Explain the concept of middleware in Express.js."
+    ]
+  },
+  "Data Science & Machine Learning": {
+    points: [
+      "Python and R programming.",
+      "Data manipulation libraries like Pandas and NumPy.",
+      "Machine learning algorithms and models.",
+      "Model evaluation and deployment."
+    ],
+    questions: [
+      "What is the difference between supervised and unsupervised learning?",
+      "Explain the concept of cross-validation.",
+      "How do you handle missing values in a dataset?",
+      "What is overfitting and how do you prevent it?"
+    ]
+  },
+  "Cloud Computing & DevOps": {
+    points: [
+      "Cloud platforms like AWS, Azure, or Google Cloud.",
+      "Containerization using Docker and orchestration with Kubernetes.",
+      "CI/CD pipelines and infrastructure as code.",
+      "Networking and security basics."
+    ],
+    questions: [
+      "What is the difference between IaaS, PaaS, and SaaS?",
+      "Explain the concept of continuous integration.",
+      "How does Docker differ from a virtual machine?",
+      "What is infrastructure as code?"
+    ]
+  }
+};
+
+
+
+function Dashboard({ user }: { user: any }) {
+  const [quizData, setQuizData] = useState<any[]>([]);
+  const [interviewData, setInterviewData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+    const fetchData = async () => {
+      try {
+        const qQuiz = query(collection(db, "users", user.uid, "quizAttempts"), orderBy("timestamp", "asc"));
+        const quizSnap = await getDocs(qQuiz);
+        const qData = quizSnap.docs.map(d => d.data());
+
+        const qInterview = query(collection(db, "users", user.uid, "interviewAttempts"), orderBy("timestamp", "asc"));
+        const interviewSnap = await getDocs(qInterview);
+        const iData = interviewSnap.docs.map(d => d.data());
+
+        setQuizData(qData);
+        setInterviewData(iData);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, [user]);
+
+  if (loading) {
+    return <div className="text-center py-8">Loading dashboard...</div>;
+  }
+
+  if (!user) {
+    return <div className="text-center py-8 text-gray-500">Sign in to track your progress and view your dashboard.</div>;
+  }
+
+  const quizChartData = quizData.map((d, idx) => ({
+    name: `Quiz ${idx + 1}`,
+    score: Math.round((d.score / d.total) * 100)
+  }));
+
+  const interviewChartData = interviewData.map((d, idx) => ({
+    name: `Int ${idx + 1}`,
+    score: d.score * 10
+  }));
+
+  const avgQuizScore = quizData.length > 0 ? (quizData.reduce((acc, d) => acc + (d.score / d.total), 0) / quizData.length) * 100 : 0;
+  const avgIntScore = interviewData.length > 0 ? (interviewData.reduce((acc, d) => acc + d.score, 0) / interviewData.length) * 10 : 0;
+
+  // Calculate improvement areas and bar chart data
+  const improvementAreas = [];
+  const skillChartData = [];
+  
+  if (quizData.length > 0) {
+    // Group by skill
+    const skillScores: Record<string, {total: number, count: number}> = {};
+    quizData.forEach(q => {
+      if (!skillScores[q.skill]) skillScores[q.skill] = {total: 0, count: 0};
+      skillScores[q.skill].total += (q.score / q.total) * 100;
+      skillScores[q.skill].count += 1;
+    });
+    
+    Object.keys(skillScores).forEach(skill => {
+      const avg = skillScores[skill].total / skillScores[skill].count;
+      skillChartData.push({ name: skill, score: Math.round(avg) });
+      if (avg < 70) {
+        improvementAreas.push({ topic: skill + " (Quiz)", score: avg });
+      }
+    });
+  }
+  
+  if (interviewData.length > 0) {
+    const sectionScores: Record<string, {total: number, count: number}> = {};
+    interviewData.forEach(i => {
+      if (!sectionScores[i.sectionTitle]) sectionScores[i.sectionTitle] = {total: 0, count: 0};
+      sectionScores[i.sectionTitle].total += i.score * 10;
+      sectionScores[i.sectionTitle].count += 1;
+    });
+    
+    Object.keys(sectionScores).forEach(section => {
+      const avg = sectionScores[section].total / sectionScores[section].count;
+      
+      const shortName = section.replace("Technical Interview - ", "").replace("1. ", "").replace("2. ", "").replace("3. ", "").replace("4. ", "");
+      const existing = skillChartData.find(d => d.name === shortName);
+      if (existing) {
+        existing.score = Math.round((existing.score + avg) / 2); // Average if exists
+      } else {
+        skillChartData.push({ name: shortName.substring(0, 15) + (shortName.length > 15 ? "..." : ""), score: Math.round(avg) });
+      }
+      
+      if (avg < 70) {
+        improvementAreas.push({ topic: shortName + " (Interview)", score: avg });
+      }
+    });
+  }
+  
+  improvementAreas.sort((a, b) => a.score - b.score);
+
+
+  return (
+    <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 mb-8">
+      <h3 className="text-xl font-bold text-gray-900 mb-6">Performance Analytics</h3>
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        <div className="bg-indigo-50 rounded-lg p-6">
+          <h4 className="text-sm font-semibold text-indigo-900 uppercase tracking-wider mb-2">Avg Quiz Score</h4>
+          <p className="text-3xl font-bold text-indigo-600">{Math.round(avgQuizScore)}%</p>
+          <p className="text-sm text-indigo-700 mt-2">Based on {quizData.length} attempts</p>
+        </div>
+        <div className="bg-green-50 rounded-lg p-6">
+          <h4 className="text-sm font-semibold text-green-900 uppercase tracking-wider mb-2">Avg Interview Score</h4>
+          <p className="text-3xl font-bold text-green-600">{Math.round(avgIntScore)}%</p>
+          <p className="text-sm text-green-700 mt-2">Based on {interviewData.length} mock sessions</p>
+        </div>
+      </div>
+
+      
+      {improvementAreas.length > 0 && (
+        <div className="mb-8">
+          <h4 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+            <Terminal className="w-5 h-5 text-orange-500" />
+            Areas for Improvement
+          </h4>
+          <div className="flex flex-wrap gap-3">
+            {improvementAreas.slice(0, 5).map((area, idx) => (
+              <span key={idx} className="bg-orange-50 text-orange-700 px-4 py-2 rounded-full text-sm font-medium border border-orange-100 flex items-center gap-2">
+                {area.topic} <span className="bg-orange-200 text-orange-800 px-2 py-0.5 rounded text-xs">{Math.round(area.score)}%</span>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+      
+      {(quizData.length > 0 || interviewData.length > 0) ? (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-4">
+          <div className="h-72 w-full bg-gray-50 p-4 rounded-xl border border-gray-100">
+            <h4 className="text-sm font-semibold text-gray-700 mb-4 text-center">Progress Trends</h4>
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart margin={{ top: 5, right: 20, bottom: 20, left: -20 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
+                <XAxis dataKey="name" allowDuplicatedCategory={false} axisLine={false} tickLine={false} tick={{fill: '#6B7280', fontSize: 12}} dy={10} />
+                <YAxis domain={[0, 100]} axisLine={false} tickLine={false} tick={{fill: '#6B7280', fontSize: 12}} />
+                <Tooltip 
+                  contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                />
+                <Legend wrapperStyle={{ paddingTop: '20px' }} />
+                {quizChartData.length > 0 && <Line type="monotone" data={quizChartData} dataKey="score" name="Quiz %" stroke="#4F46E5" strokeWidth={3} dot={{r: 4}} activeDot={{r: 6}} />}
+                {interviewChartData.length > 0 && <Line type="monotone" data={interviewChartData} dataKey="score" name="Interview %" stroke="#10B981" strokeWidth={3} dot={{r: 4}} activeDot={{r: 6}} />}
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+          
+          <div className="h-72 w-full bg-gray-50 p-4 rounded-xl border border-gray-100">
+            <h4 className="text-sm font-semibold text-gray-700 mb-4 text-center">Scores by Skill Area</h4>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={skillChartData} margin={{ top: 5, right: 20, bottom: 20, left: -20 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#6B7280', fontSize: 10}} dy={10} />
+                <YAxis domain={[0, 100]} axisLine={false} tickLine={false} tick={{fill: '#6B7280', fontSize: 12}} />
+                <Tooltip 
+                  cursor={{fill: '#F3F4F6'}}
+                  contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                />
+                <Bar dataKey="score" name="Average %" fill="#6366F1" radius={[4, 4, 0, 0]} maxBarSize={50} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      ) : (
+        <div className="text-center py-10 bg-gray-50 rounded-lg border border-dashed border-gray-300">
+          <p className="text-gray-500">Take some quizzes or mock interviews to see your progress trends here!</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function MockInterview({ user }: { user: any }) {
   const [openSection, setOpenSection] = useState<number | null>(0);
   const [activeInterviewSection, setActiveInterviewSection] = useState<string | null>(null);
+  const [selectedSkillSet, setSelectedSkillSet] = useState<string>("General Software Engineering (Default)");
 
   const sections = [
     {
@@ -351,17 +689,9 @@ export function MockInterview() {
       title: "3. Technical Interview",
       icon: <Terminal className="w-5 h-5 text-indigo-500" />,
       description: "Deep dive into your college projects, final-year work, or internships.",
-      points: [
-        "Core subject questions covering Object-Oriented Programming (OOPs), Database Management (SQL), and your preferred programming language.",
-        "Live troubleshooting or minor coding exercises to see how you think under pressure.",
-        "For tips on how to approach technical questions and explain your logic clearly during this stage: Search for 'Technical Interview Questions for Freshers' on YouTube."
-      ],
-      questions: [
-        "Explain the four pillars of OOPs with real-world examples.",
-        "What is the difference between TRUNCATE, DELETE, and DROP in SQL?",
-        "Explain your final year project. What challenges did you face and how did you overcome them?",
-        "Write code to detect a loop in a linked list."
-      ]
+      points: technicalSkillSets[selectedSkillSet as keyof typeof technicalSkillSets].points,
+      questions: technicalSkillSets[selectedSkillSet as keyof typeof technicalSkillSets].questions,
+      isTechnical: true
     },
     {
       title: "4. Managerial / Behavioral Round",
@@ -403,7 +733,7 @@ export function MockInterview() {
         >
           &larr; Back to Guide
         </button>
-        <ActiveInterview 
+        <ActiveInterview user={user} 
           sectionTitle={activeInterviewSection} 
           onClose={() => setActiveInterviewSection(null)} 
         />
@@ -420,6 +750,7 @@ export function MockInterview() {
         </p>
       </div>
 
+      <Dashboard user={user} />
       <div className="space-y-4">
         {sections.map((section, index) => (
           <div key={index} className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
@@ -442,6 +773,21 @@ export function MockInterview() {
               <div className="px-6 py-5 border-t border-gray-200">
                 <p className="text-gray-700 mb-4">{section.description}</p>
                 
+                {section.isTechnical && (
+                  <div className="mb-6">
+                    <label className="block text-sm font-semibold text-gray-900 mb-2">Select Skill Set</label>
+                    <select
+                      value={selectedSkillSet}
+                      onChange={(e) => setSelectedSkillSet(e.target.value)}
+                      className="w-full md:w-1/2 px-4 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 bg-white"
+                    >
+                      {Object.keys(technicalSkillSets).map((skill) => (
+                        <option key={skill} value={skill}>{skill}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
                 <h4 className="text-sm font-semibold text-gray-900 uppercase tracking-wider mb-2">Key Points</h4>
                 <ul className="list-disc pl-5 space-y-2 mb-6 text-gray-600">
                   {section.points.map((point, i) => (
@@ -466,7 +812,7 @@ export function MockInterview() {
 
                 <div className="flex justify-end">
                   <button
-                    onClick={() => setActiveInterviewSection(section.title)}
+                    onClick={() => setActiveInterviewSection(section.isTechnical ? `${section.title} - ${selectedSkillSet}` : section.title)}
                     className="flex items-center gap-2 bg-indigo-600 text-white px-5 py-2.5 rounded-lg font-medium hover:bg-indigo-700 transition-colors"
                   >
                     <Play className="w-4 h-4" />
