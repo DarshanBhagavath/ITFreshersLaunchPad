@@ -23,28 +23,34 @@ export function JobSearch({ userDetails }: JobSearchProps) {
     setError(null);
     try {
       const response = await fetch(`/api/jobs`);
-      const data = await response.json();
-
-      if (data.requiresConfig) {
-        setError(data.error);
-        setAllLiveJobs([]);
-      } else if (data.error) {
-        setError(data.error);
-        setAllLiveJobs([]);
+      const contentType = response.headers.get("content-type");
+      
+      if (contentType && contentType.includes("application/json")) {
+        const data = await response.json();
+        
+        if (data.requiresConfig) {
+          setError(data.error);
+          setAllLiveJobs([]);
+        } else if (data.error) {
+          setError(data.error);
+          setAllLiveJobs([]);
+        } else {
+          const formattedJobs: Job[] = (data.jobs || []).map((job: any, index: number) => ({
+            id: `live-${index}`,
+            title: job.title,
+            company: job.company_name,
+            location: job.location,
+            description: job.description || "No description provided.",
+            tags: ["Live Job", ...(job.extensions || [])].slice(0, 3),
+            applyUrl: job.apply_options?.[0]?.link || job.share_link || job.related_links?.[0]?.link || ""
+          }));
+          setAllLiveJobs(formattedJobs);
+        }
       } else {
-        const formattedJobs: Job[] = (data.jobs || []).map((job: any, index: number) => ({
-          id: `live-${index}`,
-          title: job.title,
-          company: job.company_name,
-          location: job.location,
-          description: job.description || "No description provided.",
-          tags: ["Live Job", ...(job.extensions || [])].slice(0, 3),
-          applyUrl: job.apply_options?.[0]?.link || job.share_link || job.related_links?.[0]?.link || ""
-        }));
-        setAllLiveJobs(formattedJobs);
+        throw new Error(`Server returned non-JSON response (${response.status})`);
       }
     } catch (err) {
-      setError("Failed to connect to the live job search API.");
+      setError("Failed to connect: " + (err instanceof Error ? err.message : String(err)));
       setAllLiveJobs([]);
     } finally {
       setIsLoading(false);
