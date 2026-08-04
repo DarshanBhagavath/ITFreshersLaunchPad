@@ -8,18 +8,19 @@ import { JobSearch } from "./components/JobSearch";
 import { Roadmap } from "./components/Roadmap";
 import { TrainingVideos } from "./components/TrainingVideos";
 import { Briefcase, Map, GraduationCap, LogOut, Video, FileText,
-  PieChart, Users } from "lucide-react";
+  PieChart, Users, Building } from "lucide-react";
 import { Auth } from "./components/Auth";
 import { InterviewQuiz } from "./components/InterviewQuiz";
 import { MockInterview } from "./components/MockInterview";
 import { Dashboard } from "./components/Dashboard";
+import { CompanyTests } from "./components/CompanyTests";
 import { auth, db } from "./lib/firebase";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { UserDetails } from "./types";
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<"roadmap" | "jobs" | "training" | "quiz" | "mock_interview" | "dashboard">("roadmap");
+  const [activeTab, setActiveTab] = useState<"roadmap" | "jobs" | "training" | "quiz" | "mock_interview" | "dashboard" | "company_tests">("roadmap");
   const [user, setUser] = useState<any>(null);
   const [userDetails, setUserDetails] = useState<UserDetails | null>(null);
   const [loading, setLoading] = useState(true);
@@ -136,6 +137,17 @@ export default function App() {
                 <span className="hidden sm:inline">Mock Interview</span>
               </button>
               <button
+                onClick={() => setActiveTab("company_tests")}
+                className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                  activeTab === "company_tests"
+                    ? "bg-white text-indigo-700 shadow-sm"
+                    : "text-gray-600 hover:text-gray-900 hover:bg-gray-200"
+                }`}
+              >
+                <Building className="w-4 h-4" />
+                <span className="hidden sm:inline">Company Prep</span>
+              </button>
+              <button
                 onClick={() => setActiveTab("dashboard")}
                 className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
                   activeTab === "dashboard"
@@ -166,6 +178,7 @@ export default function App() {
         {activeTab === "training" && <TrainingVideos />}
         {activeTab === "quiz" && <InterviewQuiz user={user} />}
         {activeTab === "mock_interview" && <MockInterview user={user} />}
+        {activeTab === "company_tests" && <CompanyTests user={user} />}
         {activeTab === "dashboard" && <Dashboard user={user} />}
       </main>
     </div>

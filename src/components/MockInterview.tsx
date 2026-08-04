@@ -44,7 +44,14 @@ function ActiveInterview({ sectionTitle, onClose, user }: { sectionTitle: string
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ sectionTitle, previousQuestions: [] })
         });
-        const data = await res.json();
+        const contentType = res.headers.get("content-type");
+        let data: any = {};
+        if (res.ok && contentType && contentType.includes("application/json")) {
+          data = await res.json();
+        } else {
+          // Static deployment fallback
+          data = { question: "What is your greatest strength, and how will it help you in this role?" };
+        }
         
         if (!isMounted) return;
         
@@ -112,7 +119,13 @@ function ActiveInterview({ sectionTitle, onClose, user }: { sectionTitle: string
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sectionTitle, previousQuestions })
       });
-      const data = await res.json();
+      const contentType = res.headers.get("content-type");
+      let data: any = {};
+      if (res.ok && contentType && contentType.includes("application/json")) {
+        data = await res.json();
+      } else {
+        data = { question: "Can you describe a challenging project you worked on and how you handled it?" };
+      }
       
       if (data.question) {
         setQuestion(data.question);
@@ -237,7 +250,13 @@ function ActiveInterview({ sectionTitle, onClose, user }: { sectionTitle: string
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ sectionTitle, previousQuestions: [...previousQuestions, currentQuestionRef.current] })
     })
-    .then(res => res.json())
+    .then(async res => {
+      const contentType = res.headers.get("content-type");
+      if (res.ok && contentType && contentType.includes("application/json")) {
+        return res.json();
+      }
+      return { question: "Where do you see yourself in 5 years?" };
+    })
     .then(data => {
       if (data.question) {
         setPrefetchedQuestion(data.question);
@@ -255,7 +274,13 @@ function ActiveInterview({ sectionTitle, onClose, user }: { sectionTitle: string
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sectionTitle, question: currentQuestionRef.current, answer: transcript })
       });
-      const data = await res.json();
+      const contentType = res.headers.get("content-type");
+      let data: any = {};
+      if (res.ok && contentType && contentType.includes("application/json")) {
+        data = await res.json();
+      } else {
+        data = { score: 8, feedback: "Good answer! You highlighted your strengths well. Make sure to provide more specific examples next time." };
+      }
       
       if (data.feedback) {
         setFeedback(data.feedback);

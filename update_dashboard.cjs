@@ -1,4 +1,6 @@
-import React, { useState, useEffect } from 'react';
+const fs = require('fs');
+
+const content = `import React, { useState, useEffect } from 'react';
 import { db } from "../lib/firebase";
 import { collection, query, orderBy, onSnapshot } from "firebase/firestore";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from "recharts";
@@ -59,12 +61,12 @@ export function Dashboard({ user }: { user: any }) {
   }
 
   const quizChartData = quizData.map((d, idx) => ({
-    name: `Quiz ${idx + 1}`,
+    name: \`Quiz \${idx + 1}\`,
     score: Math.round((d.score / d.total) * 100)
   }));
 
   const interviewChartData = interviewData.map((d, idx) => ({
-    name: `Int ${idx + 1}`,
+    name: \`Int \${idx + 1}\`,
     score: d.score * 10
   }));
 
@@ -226,3 +228,6 @@ export function Dashboard({ user }: { user: any }) {
     </div>
   );
 }
+`;
+
+fs.writeFileSync('src/components/Dashboard.tsx', content);
